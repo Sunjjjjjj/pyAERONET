@@ -23,178 +23,135 @@ import re
 import pickle
 from otherFunctions import *
 
+dataOutputDir = '/nobackup/users/sunj/'
+dataInputDir = '/nobackup_1/users/sunj/'
+
 
 # =============================================================================
 # inversion product
 # =============================================================================
-def AERONETinversion(caseName, startdate, enddate): 
+def AERONETinversion(caseName, startdate, enddate, parameter = 'all'): 
     """
-    Function to read AERONET Inversion product.
+    Function to read AERONET Inversion version 3 product.
     
-    -caseName: name of the folder contain AEROPNET sites for a specify case. 
-    
-    -starttime/endtime: select data from start date to end date, format in "YYYY-MM-DD".
+    caseName: the name of the folder containing AEROPNET sites to be used. 
+    starttime/endtime: select data within a peroid (closed interval), format 
+    in "YYYY-MM-DD".
+    parameter: if 'all' (default), then retrieve all parameters in the original 
+    AERONET data file; else, choose parameters of interest. The following list 
+    contains the most used parameters. If users are interested in other 
+    parameters, please find the full parameters list returned by the function. 
+    most used parameters:
+        ['AOD_Extinction-Total', 'AOD_Extinction-Fine','AOD_Extinction-Coarse', 
+         'Single_Scattering_Albedo', 'Absorption_AOD',
+         'Refractive_Index-Real_Part', 'Refractive_Index-Imaginary_Part', 
+         'Asymmetry_Factor-Total', 'Asymmetry_Factor-Fine', 
+         'Asymmetry_Factor-Coarse', 'Size_Distribution_Function'
+         ...]
     
     Return: 
-    a dictionary contains all sites. 
-    Each site is a sub-dictionary contains elements of name, lat, lon, elevation, wavelengths and data.
-    Data is in format of dataframe.
+    output: a dataframe containing all sites during the selected period. 
+    The columns are parameters.  
+    support_info: contains the full parameter list and 
+         
     
     
     @author: Sunji
-    Last updated date: 2018-10-18
+    Last updated date: 2019-10-24
     """
-    
-    
-    """
-    Initialization
-    """
-    aerCaseDir = '/nobackup/users/sunj/AERONET/%s/' % caseName     
-    filelist = glob.glob(aerCaseDir + '*.all')
-    Data = pd.DataFrame()
+# =============================================================================
+#   Initialization
+# =============================================================================
+    caseDir = dataInputDir + 'AERONET/%s/' % caseName
+    filelist = glob.glob(caseDir + '*.all')
+    output = pd.DataFrame()
 
-    for i, ff in enumerate(sorted(filelist)[:]): 
-        sys.stdout.write('\r Reading AERONET inversion # %i/%i sites' % (i + 1, len(filelist)))
-        """
-        Site information: name, lat, lon, elevation    
-        """
-        aerData = pd.read_csv(ff, sep=",", header = 6)    
-    
-        """
-        Date and time  
-        """
-        aerDate = np.array(aerData['Date(dd:mm:yyyy)'])
-        aerTime = np.array(aerData['Time(hh:mm:ss)'])
+    for isite, ff in enumerate(sorted(filelist)[:]): 
+        sys.stdout.write('\r Reading AERONET inversion version 3 # %i/%i sites' % (isite + 1, len(filelist)))
+        data = pd.read_csv(ff, sep = ",", header = 6)
+# =============================================================================
+#     Date and time  
+# =============================================================================
+        aerDate = np.array(data['Date(dd:mm:yyyy)'])
+        aerTime = np.array(data['Time(hh:mm:ss)'])
 
         dateTime = []
-        timeStamp = []
-        aerDatetime = aerDate + ' ' + aerTime
-        for i in range(len(aerDatetime)):
-            timeStamp.append(time.mktime(datetime.datetime.strptime(aerDatetime[i], '%d:%m:%Y %H:%M:%S').timetuple()))
-            year, month, day, hour, minute, second = aerDatetime[i][6:10], aerDatetime[i][3:5], aerDatetime[i][:2], aerDatetime[i][11:13], aerDatetime[i][14:16], aerDatetime[i][17:19]
-            dateTime.append(pd.to_datetime('%s-%s-%s %s:%s:%s' % (year, month, day, hour, minute, second)))
-        aerData['timeStamp'] = timeStamp
-        aerData['dateTime'] = dateTime
-        keywords = list(aerData.keys())
-
-        """
-        Select data in time period from start-date to end-date        
-        """       
-        mask = (aerData['dateTime'] >= startdate + ' 00:00:00') & (aerData['dateTime'] <= enddate + ' 23:59:59')
-        aerData = aerData[mask] 
+#        timeStamp = []
+#        aerDatetime = aerDate + ' ' + aerTime
+        for i in range(len(data)):
+#            timeStamp.append(time.mktime(datetime.datetime.strptime(aerDatetime[i], '%d:%m:%Y %H:%M:%S').timetuple()))
+            dateTime.append(pd.to_datetime('%s %s' %(aerDate[i], aerTime[i]), format ='%d:%m:%Y %H:%M:%S'))
+        data['dateTime'] = dateTime
+        del data['Date(dd:mm:yyyy)'], data['Time(hh:mm:ss)']
+#        data['timeStamp'] = pd.timeStamp(dateTime)
+# =============================================================================
+#     Select data in time period 
+# =============================================================================
+        mask = (data['dateTime'] >= startdate) & (data['dateTime'] <= pd.to_datetime(enddate) + pd.Timedelta(days = 1))
+        data = data[mask] 
+# =============================================================================
+#     Select parameters of interest
+# =============================================================================
+        # parameter names are same for all AERONET site, thus only retrieve  parameters of the first site
+#        if isite == 0: 
+        # retrieve all parameters in the original AERONET data file
+        parameterList = list(data.keys())
+        # initialization
+        POI = []
+        # retrieve all parameters
+        if parameter == 'all':
+            POI = parameterList.copy()
+        # retrieve parameters of interest (POI)
+        else:
+            # site information
+            paraSite = ['Site', 'Latitude(Degrees)', 'Longitude(Degrees)', 'Elevation(m)', 'dateTime']
+            # check whether each parameter is in POI list
+            for ipara in parameter:
+                # retrieve particle size if required by users
+                if ipara == 'Size_Distribution_Function':
+                    for iparaList in parameterList: 
+                        try:
+                            temp = float(iparaList)
+                            POI.append(iparaList)
+                        except:
+                            pass
+                # retrieve other parameters other than particle size
+                else:
+                    for iparaList in parameterList: 
+                        if ipara in iparaList: 
+                            POI.append(iparaList)
+            POI += paraSite
+# =============================================================================
+#    retrieve wavelength and particle size 
+# =============================================================================
+        # initialization
+        wvl = []
+        particleSize = []
+         
+        for iparaList in parameterList: 
+            # retrieve wavelength
+            if 'Single_Scattering_Albedo' in iparaList:
+                try: 
+                    wvl.append(float(re.findall("\d+", iparaList)[0]))
+                except:
+                    pass 
+             # retrieve particle size 
+            try:
+                particleSize.append(float(iparaList))
+            except:
+                pass
         
-        """
-        keys of interest
-        """
-        keywords = keywords[0:1] + keywords[5:75] + keywords[-8:]
-
-        """
-        Output  
-        """
-        Data = Data.append(aerData[keywords])
-
-#        """
-#        Wavelength and complex refractive index, SSA, AAOD, asymmetry factor
-#        """
-#        refr = []
-#        refi = []
-#        ssa = []
-#        aaod = []
-#        asy = []
-#        Angstorm = []
-#        size = []
-#        wvl = []
-#        for ikey in keywords:
-#            if ikey.find('REFR') == 0:
-#                refr.append(ikey)
-#                wvl.append(float(re.findall(r'\d+', ikey)[0]))
-#            if ikey.find('REFI') == 0:
-#                refi.append(ikey)
-#            if ikey.find('SSA') == 0:
-#                ssa.append(ikey)
-#            if (ikey.find('AOTAbsp') == 0):
-#                aerData[ikey][aerData[ikey]<0] = np.nan
-#                aaod.append(ikey)
-#            if ikey.find('ASYM') == 0:
-#                asy.append(ikey)
-#            if ikey.find('Angstrom') >= 0:
-#                Angstorm.append(ikey)
-#            try:
-#                size.append(float(ikey))
-#            except ValueError:
-#                pass
-#
-#        parameters = refr + refi + ssa + aaod + asy + Angstorm
-#        
-#        """
-#        Size distribution function
-#        """
-#        def float2str(data):
-#            return '%1.6f' % (data)
-#        sizekey = list(map(float2str, size))
-#
-#        prob = aerData[sizekey].values
-#        size = np.array(size)
-#        # seperate fine and coarse mode         
-#        fine = np.ones(len(prob)) * np.nan
-#        coarse = np.ones(len(prob)) * np.nan
-#        Cv_f = np.ones(len(prob)) * np.nan
-#        Cv_c = np.ones(len(prob)) * np.nan
-#        for k in range(len(prob)):
-#            peaks = argrelextrema(prob[k,:], np.greater)[0]
-#            if len(peaks) > 0: 
-#                fine[k] = size[peaks[0]]
-#                coarse[k] = size[peaks[-1]]
-#                fcidx = argrelextrema(prob[k,:],np.less)[0]
-#                if len(fcidx) == 1:
-#                    if fine[k] < 1: 
-##                        print('Only fine mode', k)
-#                        Cv_c[k] = np.nan
-#                        Cv_f[k] = 1 - Cv_c[k]
-#                        coarse[k] = np.nan
-#                    else:
-##                        print('Only coarse mode', k)
-#                        Cv_f[k] = np.nan
-#                        Cv_c[k] = 1
-#                        fine[k] = np.nan
-#                if len(fcidx) > 1:    
-#                    fcidx = argrelextrema(prob[k,:],np.less)[0][0]
-#                    Cv_f[k] = trapz(prob[k, 0:fcidx+1],dx = 0.01)
-#                    Cv_c[k] = trapz(prob[k, fcidx:-1], dx = 0.01) 
-#            else:
-#                # no data
-#                fine[k] = np.nan
-#                coarse[k] = np.nan
-#                Cv_f[k] = np.nan
-#                Cv_c[k] = np.nan
-#        # convert volume to number density
-#        sigma_f = 1.5
-#        sigma_c = 2.0 
-#        r_f = fine / np.exp(3*(np.log(sigma_f)**2))
-#        r_c = coarse / np.exp(3*(np.log(sigma_c)**2))
-#        
-#        try: 
-#            rfc_Cn = (Cv_f / Cv_c) * (r_c / r_f)**3 * np.exp(-4.5 * (sigma_f**2 - sigma_c**2))  
-#            rfc_Cv = Cv_f / Cv_c
-#            wfc_n = rfc_Cn / (rfc_Cn + 1.) 
-#            wfc_v = rfc_Cv / (rfc_Cv + 1.)
-#        except RuntimeWarning:
-#            print('Divided by zero!')
-#        
-#        temp = np.c_[r_f, r_c, wfc_n, wfc_v]
-#        sizefunc = pd.DataFrame(temp, columns = ['rf', 'rc', 'wnum', 'wvol'])
-
-#        data = pd.concat([timeseries, aerData[parameters], sizefunc], axis = 1).iloc[idxDate]
-#        
-#        
-#        data.index = data['dateTime']
-#        del data['dateTime']
-#        
-#        data = data.dropna(axis = 1, how = 'all')
-#        para = {'lat': aerlat, 'lon': aerlon, 'elev': aerelv, 'data': data}
-#        Data[aername] = para
-    Data[Data == -999] = np.nan
-    return Data
+        # pass this procedue for other site
+#        else:
+#            pass
+        output = output.append(data[POI])
+# =============================================================================
+#     Output
+# =============================================================================
+    # remove outliers
+    output[output == -999] = np.nan
+    support_info = {'parameter': parameterList, 'wavelength': wvl, 'particleSize': np.array(sorted(particleSize))}
+    return output.reset_index(drop = True), support_info
     
 
 
@@ -202,73 +159,114 @@ def AERONETinversion(caseName, startdate, enddate):
 # =============================================================================
 # direct sun products
 # =============================================================================
-def AERONETdirectSun(caseName, startdate, enddate):
+def AERONETdirectSun(caseName, startdate, enddate, parameter = 'all'):
     """
-    Function to read AERONET direct sun product.
+    Function to read AERONET direct sun version 3 product.
     
-    -caseName: name of the folder contain AEROPNET sites for a specify case. 
-    
-    -starttime/endtime: select data from start date to end date, format in "YYYY-MM-DD".
+    caseName: the name of the folder containing AEROPNET sites to be used. 
+    starttime/endtime: select data within a peroid (closed interval), format 
+    in "YYYY-MM-DD".
+    parameter: if 'all'(default), then retrieve all parameters in the original 
+    AERONET data file; else, choose parameters of interest. The following list 
+    contains the most used parameters. If users are interested in other 
+    parameters, please find the full parameters list returned by the function. 
+    most used parameters:
+        ['AOD', 'Angstrom_Exponent', 
+         ...]
     
     Return: 
-    a dictionary contains all sites. 
-    Each site is a sub-dictionary contains elements of name, lat, lon, elevation, wavelengths and data.
-    Data is in format of dataframe.
-    
+    output: a dataframe containing all sites during the selected period. 
+    The columns are parameters.  
+    support_info: contains the full parameter list and 
+         
     
     @author: Sunji
-    Last updated date: 2018-10-18
+    Last updated date: 2019-10-24
     """
 
-    """
-    Initialization
-    """
-    aerCaseDir = '/nobackup/users/sunj/AERONET/%s/' % caseName    
-    filelist = glob.glob(aerCaseDir + '*.lev15*')
-    Data = pd.DataFrame()
+# =============================================================================
+#     Initialization
+# =============================================================================
+    aerCaseDir = dataInputDir + 'AERONET/%s/' % caseName    
+    filelist = glob.glob(aerCaseDir + '*lev*')
+    output = pd.DataFrame()
     
-    for i, ff in enumerate(sorted(filelist)[:]):
-        sys.stdout.write('\r Reading AERONET direct sun # %i/%i sites' % (i + 1, len(filelist)))
-        """
-        Site information: name, lat, lon, elevation
-        """
-        aerData = pd.read_csv(ff, sep=",", header = 6)    
+    for isite, ff in enumerate(sorted(filelist)[:]):
+        sys.stdout.write('\r Reading AERONET direct sun version 3 # %i/%i sites' % (isite + 1, len(filelist)))
+        data = pd.read_csv(ff, sep = ",", header = 6)    
 
-        """
-        Date and time  
-        """
-        aerDate = np.array(aerData['Date(dd:mm:yyyy)'])
-        aerTime = np.array(aerData['Time(hh:mm:ss)'])
-        
+# =============================================================================
+#    Date and time  
+# =============================================================================
+        aerDate = np.array(data['Date(dd:mm:yyyy)'])
+        aerTime = np.array(data['Time(hh:mm:ss)'])
+
         dateTime = []
-        timeStamp = []
-        aerDatetime = aerDate + ' ' + aerTime
-        for i in range(len(aerDatetime)):
-            timeStamp.append(time.mktime(datetime.datetime.strptime(aerDatetime[i], '%d:%m:%Y %H:%M:%S').timetuple()))
-            year, month, day, hour, minute, second = aerDatetime[i][6:10], aerDatetime[i][3:5], aerDatetime[i][:2], aerDatetime[i][11:13], aerDatetime[i][14:16], aerDatetime[i][17:19]
-            dateTime.append(pd.to_datetime('%s-%s-%s %s:%s:%s' % (year, month, day, hour, minute, second)))
-        aerData['timeStamp'] = timeStamp
-        aerData['dateTime'] = dateTime
-        keywords = list(aerData.keys())
-
-        """
-        Select data in time period from start-date to end-date        
-        """       
-        mask = (aerData['dateTime'] >= startdate + ' 00:00:00') & (aerData['dateTime'] <= enddate + ' 23:59:59')
-        aerData = aerData[mask] 
-        
-        """
-        keys of interest
-        """
-        for ikey in sorted(keywords):
-            if (ikey.find('Triplet_Variability') >= 0) | (ikey.find('Exact_Wavelengths_') >= 0):
-                keywords.remove(ikey)
-        """
-        Output
-        """
-        Data = Data.append(aerData[keywords])
-    Data[Data == -999] = np.nan
-    return Data
+#        timeStamp = []
+#        aerDatetime = aerDate + ' ' + aerTime
+        for i in range(len(data)):
+#            timeStamp.append(time.mktime(datetime.datetime.strptime(aerDatetime[i], '%d:%m:%Y %H:%M:%S').timetuple()))
+            dateTime.append(pd.to_datetime('%s %s' %(aerDate[i], aerTime[i]), format ='%d:%m:%Y %H:%M:%S'))
+        data['dateTime'] = dateTime
+        del data['Date(dd:mm:yyyy)'], data['Time(hh:mm:ss)']
+#        data['timeStamp'] = pd.timeStamp(dateTime)
+# =============================================================================
+#    Select data in time period 
+# =============================================================================
+        mask = (data['dateTime'] >= startdate) & (data['dateTime'] <= pd.to_datetime(enddate) + pd.Timedelta(days = 1))
+        data = data[mask] 
+# =============================================================================
+#    Select parameter of interest
+# =============================================================================
+        # parameter names are same for all AERONET site, thus only retrieve parameters of the first site
+#        if isite == 0: 
+        # retrieve all parameters in the original AERONET data file
+        parameterList = list(data.keys())
+        # initialization
+        POI = []
+        wvl = []
+        # retrieve all parameters
+        if parameter == 'all':
+            POI = parameterList.copy()
+            # retrieve particle size if required by users
+            for iparaList in parameterList: 
+                if (iparaList[:4] == 'AOD_') & (iparaList[-2:] == 'nm'):
+                    try:
+                        wvl.append(float(re.findall("\d+", iparaList)[0]))
+                    except:
+                        pass
+        # retrieve parameters of interest (POI)
+        else:
+            # site information
+            paraSite = ['AERONET_Site_Name', 'Site_Latitude(Degrees)', 'Site_Longitude(Degrees)', 'Site_Elevation(m)', 'dateTime', \
+                        'Solar_Zenith_Angle(Degrees)']
+            # check whether each parameter is in POI list
+            for ipara in parameter:
+                # retrieve particle size if required by users
+                if ipara == 'AOD':
+                    for iparaList in parameterList: 
+                        if (iparaList[:4] == 'AOD_') & (iparaList[-2:] == 'nm'):
+                            try:
+                                wvl.append(float(re.findall("\d+", iparaList)[0]))
+                                POI.append(iparaList)
+                            except:
+                                pass
+                    # retrieve other parameters other than particle size
+                else:
+                    for iparaList in parameterList: 
+                        if ipara in iparaList: 
+                            POI.append(iparaList)
+            POI += paraSite
+        # pass this procedue for other site
+#        else:
+#            pass
+        output = output.append(data[POI])
+# =============================================================================
+#         Output
+# =============================================================================
+    output[output == -999] = np.nan
+    support_info = {'parameter': parameterList, 'wavelength': np.array(sorted(wvl))}
+    return output.reset_index(drop = True), support_info
 
 
 
@@ -472,26 +470,30 @@ def AERONETwvlProcess(Data, POI, WOI, wvlProcessMethod = 'linear'):
 #    main()
     
 
-#ROI = {'S':-90, 'N': 90, 'W': -180, 'E': 180}
-#casedir = '/nobackup/users/sunj/AERONET/AERONET_global_yearly/'
+ROI = {'S':-90, 'N': 90, 'W': -180, 'E': 180}
+casedir = dataInputDir + 'AERONET/Global_2005-2018_v3/'
+
+t1 = time.time()
+caseName = 'CA2017-18'
+
+startdate = '%4i-%02i-%02i' % (2019, 1, 1)
+enddate   = '%4i-%02i-%02i' % (2019, 12, 31) 
+
+parameter = ['AOD_Extinction-Total', 'AOD_Extinction-Fine','AOD_Extinction-Coarse', 
+         'Single_Scattering_Albedo', 'Absorption_AOD'] 
+
+
+INV, support_info = AERONETinversion(caseName, startdate, enddate, parameter = parameter)
+parameter = ['AOD', 'Angstrom_Exponent']
+
+DS, support_info = AERONETdirectSun(caseName, startdate, enddate, parameter = parameter)
 #
-#t1 = time.time()
-#for iyear in np.arange(2005, 2017):
-#    caseName = 'Global_2005-2017'
-#    
-#    startdate = '%4i-%02i-%02i' % (iyear, 1, 1)
-#    enddate   = '%4i-%02i-%02i' % (iyear, 12, 31) 
-#    
-#    INV = AERONETinversion(caseName, startdate, enddate)
-#    DS = AERONETdirectSun(caseName, startdate, enddate)
-#    
-#    INV_int = AERONETwvlProcess(INV, ['SSA', 'AOTAbsp'], [388, 440, 500, 532, 550], 'linear')
-#    DS_int = AERONETwvlProcess(DS, ['AOT'], [388, 440, 500, 532, 550], 'linear')
-#    
-#    with open(casedir + 'INV_%4i.pickle' % (iyear), 'wb') as handle:
-#        pickle.dump(INV_int, handle, protocol=pickle.HIGHEST_PROTOCOL)
-#    with open(casedir + 'DS_%4i.pickle' % (iyear), 'wb') as handle:
-#        pickle.dump(DS_int, handle, protocol=pickle.HIGHEST_PROTOCOL)
-#        
-#t2 = time.time()
-#print('Time: %1.2f s' % (t2 - t1))        
+#INV_int = AERONETwvlProcess(INV, ['SSA', 'AOTAbsp'], [388, 440, 500, 532, 550], 'linear')
+#DS_int = AERONETwvlProcess(DS, ['AOT'], [388, 440, 500, 532, 550], 'linear')
+
+#with open(casedir + 'INV_%4i.pickle' % (iyear), 'wb') as handle:
+#    pickle.dump(INV_int, handle, protocol=pickle.HIGHEST_PROTOCOL)
+#with open(casedir + 'DS_%4i.pickle' % (iyear), 'wb') as handle:
+#    pickle.dump(DS_int, handle, protocol=pickle.HIGHEST_PROTOCOL)
+t2 = time.time()
+print('Time: %1.2f s' % (t2 - t1))        

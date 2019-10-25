@@ -70,30 +70,31 @@ def AERONETinversion(caseName, startdate, enddate, parameter = 'all'):
         sys.stdout.write('\r Reading AERONET inversion version 3 # %i/%i sites' % (isite + 1, len(filelist)))
         data = pd.read_csv(ff, sep = ",", header = 6)
 # =============================================================================
-#     Date and time  
+#     Date and time
 # =============================================================================
         aerDate = np.array(data['Date(dd:mm:yyyy)'])
         aerTime = np.array(data['Time(hh:mm:ss)'])
+        lag = round(data['Longitude(Degrees)'] / 15)
 
         dateTime = []
-#        timeStamp = []
-#        aerDatetime = aerDate + ' ' + aerTime
+        dataTimeLocal = []
         for i in range(len(data)):
-#            timeStamp.append(time.mktime(datetime.datetime.strptime(aerDatetime[i], '%d:%m:%Y %H:%M:%S').timetuple()))
-            dateTime.append(pd.to_datetime('%s %s' %(aerDate[i], aerTime[i]), format ='%d:%m:%Y %H:%M:%S'))
+            temp = pd.to_datetime('%s %s' %(aerDate[i], aerTime[i]), format ='%d:%m:%Y %H:%M:%S')
+            dateTime.append(temp)
+            dataTimeLocal.append(temp + np.sign(lag[i]) * pd.Timedelta(abs(lag[i]), 'h'))
         data['dateTime'] = dateTime
+        data['dateTimeLocal'] = dataTimeLocal
+        data['timeStamp'] = data['dateTime'].values.astype(np.int64) // 10 ** 9
+        data['timeStampLocal'] = data['dateTimeLocal'].values.astype(np.int64) // 10 ** 9
         del data['Date(dd:mm:yyyy)'], data['Time(hh:mm:ss)']
-#        data['timeStamp'] = pd.timeStamp(dateTime)
 # =============================================================================
-#     Select data in time period 
+#     Select data in time period using local date and time
 # =============================================================================
-        mask = (data['dateTime'] >= startdate) & (data['dateTime'] <= pd.to_datetime(enddate) + pd.Timedelta(days = 1))
+        mask = (data['dateTimeLocal'] >= startdate) & (data['dateTimeLocal'] <= pd.to_datetime(enddate) + pd.Timedelta(days = 1))
         data = data[mask] 
 # =============================================================================
 #     Select parameters of interest
 # =============================================================================
-        # parameter names are same for all AERONET site, thus only retrieve  parameters of the first site
-#        if isite == 0: 
         # retrieve all parameters in the original AERONET data file
         parameterList = list(data.keys())
         # initialization
@@ -104,7 +105,8 @@ def AERONETinversion(caseName, startdate, enddate, parameter = 'all'):
         # retrieve parameters of interest (POI)
         else:
             # site information
-            paraSite = ['Site', 'Latitude(Degrees)', 'Longitude(Degrees)', 'Elevation(m)', 'dateTime']
+            paraSite = ['Site', 'Latitude(Degrees)', 'Longitude(Degrees)', 'Elevation(m)', \
+                        'dateTime', 'dateTimeLocal', 'timeStamp', 'timeStampLocal']
             # check whether each parameter is in POI list
             for ipara in parameter:
                 # retrieve particle size if required by users
@@ -141,9 +143,6 @@ def AERONETinversion(caseName, startdate, enddate, parameter = 'all'):
             except:
                 pass
         
-        # pass this procedue for other site
-#        else:
-#            pass
         output = output.append(data[POI])
 # =============================================================================
 #     Output
@@ -195,31 +194,36 @@ def AERONETdirectSun(caseName, startdate, enddate, parameter = 'all'):
         sys.stdout.write('\r Reading AERONET direct sun version 3 # %i/%i sites' % (isite + 1, len(filelist)))
         data = pd.read_csv(ff, sep = ",", header = 6)    
 
+        data = data.rename(columns = {'AERONET_Site_Name': 'Site',
+                             'Site_Latitude(Degrees)': 'Latitude(Degrees)',
+                             'Site_Longitude(Degrees)': 'Longitude(Degrees)', 
+                             'Site_Elevation(m)': 'Elevation(m)'})
 # =============================================================================
 #    Date and time  
 # =============================================================================
         aerDate = np.array(data['Date(dd:mm:yyyy)'])
         aerTime = np.array(data['Time(hh:mm:ss)'])
+        lag = round(data['Longitude(Degrees)'] / 15)
 
         dateTime = []
-#        timeStamp = []
-#        aerDatetime = aerDate + ' ' + aerTime
+        dataTimeLocal = []
         for i in range(len(data)):
-#            timeStamp.append(time.mktime(datetime.datetime.strptime(aerDatetime[i], '%d:%m:%Y %H:%M:%S').timetuple()))
-            dateTime.append(pd.to_datetime('%s %s' %(aerDate[i], aerTime[i]), format ='%d:%m:%Y %H:%M:%S'))
+            temp = pd.to_datetime('%s %s' %(aerDate[i], aerTime[i]), format ='%d:%m:%Y %H:%M:%S')
+            dateTime.append(temp)
+            dataTimeLocal.append(temp + np.sign(lag[i]) * pd.Timedelta(abs(lag[i]), 'h'))
         data['dateTime'] = dateTime
+        data['dateTimeLocal'] = dataTimeLocal
+        data['timeStamp'] = data['dateTime'].values.astype(np.int64) // 10 ** 9
+        data['timeStampLocal'] = data['dateTimeLocal'].values.astype(np.int64) // 10 ** 9
         del data['Date(dd:mm:yyyy)'], data['Time(hh:mm:ss)']
-#        data['timeStamp'] = pd.timeStamp(dateTime)
 # =============================================================================
-#    Select data in time period 
+#    Select data in time period using local date and time
 # =============================================================================
-        mask = (data['dateTime'] >= startdate) & (data['dateTime'] <= pd.to_datetime(enddate) + pd.Timedelta(days = 1))
+        mask = (data['dateTimeLocal'] >= startdate) & (data['dateTimeLocal'] <= pd.to_datetime(enddate) + pd.Timedelta(days = 1))
         data = data[mask] 
 # =============================================================================
 #    Select parameter of interest
 # =============================================================================
-        # parameter names are same for all AERONET site, thus only retrieve parameters of the first site
-#        if isite == 0: 
         # retrieve all parameters in the original AERONET data file
         parameterList = list(data.keys())
         # initialization
@@ -238,8 +242,8 @@ def AERONETdirectSun(caseName, startdate, enddate, parameter = 'all'):
         # retrieve parameters of interest (POI)
         else:
             # site information
-            paraSite = ['AERONET_Site_Name', 'Site_Latitude(Degrees)', 'Site_Longitude(Degrees)', 'Site_Elevation(m)', 'dateTime', \
-                        'Solar_Zenith_Angle(Degrees)']
+            paraSite = ['Site', 'Latitude(Degrees)', 'Longitude(Degrees)', 'Elevation(m)', \
+                        'dateTime', 'dateTimeLocal', 'timeStamp', 'timeStampLocal', 'Solar_Zenith_Angle(Degrees)']
             # check whether each parameter is in POI list
             for ipara in parameter:
                 # retrieve particle size if required by users
@@ -257,9 +261,7 @@ def AERONETdirectSun(caseName, startdate, enddate, parameter = 'all'):
                         if ipara in iparaList: 
                             POI.append(iparaList)
             POI += paraSite
-        # pass this procedue for other site
-#        else:
-#            pass
+
         output = output.append(data[POI])
 # =============================================================================
 #         Output
@@ -273,79 +275,87 @@ def AERONETdirectSun(caseName, startdate, enddate, parameter = 'all'):
 # =============================================================================
 # AERONET time process
 # =============================================================================
-def AERONETtimeProcess(Data, timeProcessMethod = 'daily', *arg):
+def AERONETtimeProcess(data, freq = 'day', window = False, **kwargs):
     """
-    Function to process AERONET product.
+    Function to process AERONET.
     
-    -Data: outputs of AERONETinversion or AERONETdirectSun.
-        
-    -timeProcessMethod: time processing methods.
-    choose among 'period' (average over a certain period), 'daily' (daily mean, default), 'monthly' (monhly mean).
+    data: outputs of AERONETinversion or AERONETdirectSun.
+    freq: time processing frequency, chosse from 'original', 'month', 'day' and
+    'hour'.
+    window: whether use a time window in case of, e.g, satellite 
+    overpass period. If False, then use all records.
+    span: if period is True, then specify the time window in '**kwarg', e.g. if 
+    the time window is 13 p.m -14 p.m., then specify as ['13:00:00', '14:00:00'].
+    Note the time is LOCAL time, NOT the UTC.
     
-    -*arg: if processing method is 'period', time period is need to be specified by ctime and dtime. 
-    period = ctime (format in datetime or timestamp) +/- dtime (in second) 
-    
-    Return: 
-    a dictionary contains all sites with processed data. 
-    Each site is a sub-dictionary contains elements of name, lat, lon, elevation, wavelengths and data.
-    Data is in format of dataframe.
-    
+    Return:
+    Temporal mean and std of input AERONET input data.
     
     @author: Sunji
-    Last updated date: 2018-10-18
+    Last updated date: 2019-10-25
     """
 
-    """
-    Initialization
-    """
-    output = {}
-    for i, isite in enumerate(Data.keys()):
-        sys.stdout.write('\r Time processing # %i/%i sites' % (i + 1, len(Data.keys())))
-        output[isite] = {'lat': Data[isite]['lat'], 'lon': Data[isite]['lon'], 'elev': Data[isite]['elev']}
-        processed = pd.DataFrame()
-        data = Data[isite]['data'].copy()
+# =============================================================================
+#     Initialization
+# =============================================================================
+    timedf = pd.DataFrame()
+    # use local date and time
+    timedf['year'] = data.dateTimeLocal.dt.year
+    timedf['YYMM'] = data.dateTimeLocal.dt.to_period('M')
+    timedf['date'] = data.dateTimeLocal.dt.to_period('D')
+    timedf['time'] = data.dateTimeLocal.dt.time
+    timedf['hour'] = data.dateTimeLocal.dt.to_period('H')
+# =============================================================================
+#    Select records within period of interest
+# =============================================================================
+    # no time window
+    if ~window:
+        pass
+    # specified time winder
+    if window:
+        span = kwargs['span']
+        starttime = pd.to_datetime(span[0], format = '%H:%M:%S')
+        endtime = pd.to_datetime(span[1], format = '%H:%M:%S')
+        mask = (timedf['time'] >= starttime.time()) & (timedf['time'] <= endtime.time())
+        data = data[mask] 
+# =============================================================================
+#    Temporal processed
+# =============================================================================
+    # no process
+    if freq == 'original':
+        data_mean = data.copy()
+        data_std = None
+    # process based on frequency of hour, day or month
+    else:
+        if freq == 'hour':
+            data_mean = data.groupby([timedf['hour'], 'Site']).mean()
+            data_std = data.groupby([timedf['hour'], 'Site']).std()
+            count = data.groupby([timedf['hour'], 'Site']).count()
         
-        if len(data) > 0: 
-            """
-            Monthly mean
-            """
-            if timeProcessMethod == 'monthly':
-                data['YY-MM'] = data.index.to_period('M')
-                processed = data.groupby('YY-MM').mean()
-            else:
-                data['YY-MM-DD'] = data.index.to_period('D')
-                """
-                Daily mean
-                """            
-                if timeProcessMethod == 'daily':
-                    try:
-                        processed = data.groupby('YY-MM-DD').mean()
-                    except:
-                        pass
-                """
-                Co-time-period mean
-                """
-                if timeProcessMethod == 'period':
-                    ctime, dtime = arg[0], arg[1]
-                    try:
-                        timestart = ctime - dtime
-                        timeend = ctime + dtime
-                        tsrange = (data.timeStamp >= timestart) & (data.timeStamp < timeend)
-                        ctime = datetime.datetime.fromtimestamp(ctime)
-                    except:
-                        timestart = ctime - datetime.timedelta(seconds=dtime)
-                        timeend = ctime + datetime.timedelta(seconds=dtime)
-                        tsrange = (data.index >= timestart) & (data.index < timeend)
-                    if tsrange.sum() > 0:
-                        processed = data[tsrange].mean()
-                        processed = processed.to_frame().T
-                        processed.index = pd.Series(ctime)
-        """
-        Output
-        """
-        output[isite]['data'] = processed
-                    
-    return pd.DataFrame.from_dict(output)
+        if freq == 'day':
+            data_mean = data.groupby([timedf['date'], 'Site']).mean()
+            data_std = data.groupby([timedf['date'], 'Site']).std()
+            count = data.groupby([timedf['date'], 'Site']).count()
+    
+        if freq == 'month':
+            data_mean = data.groupby([timedf['YYMM'], 'Site']).mean()
+            data_std = data.groupby([timedf['YYMM'], 'Site']).std()
+            count = data.groupby([timedf['YYMM'], 'Site']).count()
+
+        # reset index, dateTime and time Stamp
+        data_mean.reset_index(inplace = True)
+        data_std.reset_index(inplace = True)
+        data_mean['num'] = count.values[:, 0]
+        data_std['num'] = count.values[:, 0]
+        
+        data_mean['dateTime'] = pd.to_datetime(data_mean['timeStamp'] * 10 ** 9)
+        data_std['dateTime'] = pd.to_datetime(data_mean['timeStamp'] * 10 ** 9)
+        data_mean['dateTimeLocal'] = pd.to_datetime(data_mean['timeStampLocal'] * 10 ** 9)
+        data_std['dateTimeLocal'] = pd.to_datetime(data_mean['timeStampLocal'] * 10 ** 9)
+# =============================================================================
+#    Output
+# =============================================================================
+    return data_mean, data_std
 
 # =============================================================================
 # AERONET wavelength interpolation/extrapolation
@@ -476,18 +486,21 @@ casedir = dataInputDir + 'AERONET/Global_2005-2018_v3/'
 t1 = time.time()
 caseName = 'CA2017-18'
 
-startdate = '%4i-%02i-%02i' % (2019, 1, 1)
-enddate   = '%4i-%02i-%02i' % (2019, 12, 31) 
+startdate = '%4i-%02i-%02i' % (2019, 5, 1)
+enddate   = '%4i-%02i-%02i' % (2019, 5, 31) 
 
 parameter = ['AOD_Extinction-Total', 'AOD_Extinction-Fine','AOD_Extinction-Coarse', 
          'Single_Scattering_Albedo', 'Absorption_AOD'] 
 
+parameter = ['AOD_Extinction-Total', 
+         'Single_Scattering_Albedo', 'Absorption_AOD'] 
 
 INV, support_info = AERONETinversion(caseName, startdate, enddate, parameter = parameter)
+INV_mean, INV_std = AERONETtimeProcess(INV, freq = 'day', window = True, span = ['13:00:00', '14:30:00'])
 parameter = ['AOD', 'Angstrom_Exponent']
-
 DS, support_info = AERONETdirectSun(caseName, startdate, enddate, parameter = parameter)
-#
+DS_mean, DS_std = AERONETtimeProcess(DS, freq = 'day', window = True, span = ['13:00:00', '14:30:00'])
+
 #INV_int = AERONETwvlProcess(INV, ['SSA', 'AOTAbsp'], [388, 440, 500, 532, 550], 'linear')
 #DS_int = AERONETwvlProcess(DS, ['AOT'], [388, 440, 500, 532, 550], 'linear')
 

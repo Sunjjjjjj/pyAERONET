@@ -360,17 +360,13 @@ def AERONETtimeProcess(data, freq = 'day', window = False, **kwargs):
 # =============================================================================
 # AERONET wavelength interpolation/extrapolation
 # =============================================================================
-def AERONETwvlProcess(Data, POI, WOI, wvlProcessMethod = 'linear'):
+def AERONETwvlProcess(data, parameter, wavelength, method = 'linear'):
     """
     Function to process AERONET product.
-    
-    -Data: outputs of AERONETinversion or AERONETdirectSun.
-    
-    -POI: parameters of interest.
-    
-    -WOI: wavelengths of interest to be interpolated/extrapolated.
-    
-    -wvlProcessMethod: interpolation/extrapolation methods,
+    data: outputs of AERONETinversion or AERONETdirectSun.
+    parameter: parameters of interest.
+    wavelength: wavelengths of interest to be interpolated/extrapolated.
+    method: interpolation/extrapolation methods,
     choose among 'linear' (default), 'quadratic', 'cubic.
     If the parameter is AOT or AOTabsp, the Angstorm Exponent will be used instead of given method.
     
@@ -383,12 +379,12 @@ def AERONETwvlProcess(Data, POI, WOI, wvlProcessMethod = 'linear'):
     
     
     @author: Sunji
-    Last updated date: 2018-10-18
+    Last updated date: 2019-10-25
     """
 
-    """
-    Initialization
-    """
+# =============================================================================
+#     Initialization
+# =============================================================================
     output = {}
     for i, isite in enumerate(Data.keys()):
         sys.stdout.write('\r Wavelength processing # %i/%i sites' % (i + 1, len(Data.keys())))
@@ -500,6 +496,8 @@ INV_mean, INV_std = AERONETtimeProcess(INV, freq = 'day', window = True, span = 
 parameter = ['AOD', 'Angstrom_Exponent']
 DS, support_info = AERONETdirectSun(caseName, startdate, enddate, parameter = parameter)
 DS_mean, DS_std = AERONETtimeProcess(DS, freq = 'day', window = True, span = ['13:00:00', '14:30:00'])
+
+
 
 #INV_int = AERONETwvlProcess(INV, ['SSA', 'AOTAbsp'], [388, 440, 500, 532, 550], 'linear')
 #DS_int = AERONETwvlProcess(DS, ['AOT'], [388, 440, 500, 532, 550], 'linear')

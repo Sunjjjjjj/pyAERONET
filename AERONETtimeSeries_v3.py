@@ -21,11 +21,15 @@ from scipy.signal import argrelextrema
 from numpy import trapz
 import re
 import pickle
-from otherFunctions import *
+#from otherFunctions import *
 
 dataOutputDir = '/nobackup/users/sunj/'
 dataInputDir = '/nobackup_1/users/sunj/'
 
+
+pwd = os.getcwd()
+dataOutputDir = pwd + '/'
+dataInputDir = pwd + '/'
 
 # =============================================================================
 # inversion product
@@ -360,11 +364,21 @@ def AERONETtimeProcess(data, freq = 'day', window = False, **kwargs):
 # =============================================================================
 # AERONET wavelength interpolation/extrapolation
 # =============================================================================
-def AERONETwvlProcess(data, parameter, wavelength, method = 'linear'):
+def AERONETwvlProcess(data, support_info, parameter, wavelength, method = 'linear'):
     """
     Function to process AERONET product.
     data: outputs of AERONETinversion or AERONETdirectSun.
-    parameter: parameters of interest.
+    parameter: parameters of interest. Select from the following parameters: 
+    [AOD_Extinction-Total, AOD_Extinction-Coarse, AOD_Extinction-Fine, 
+    symmetry_Factor-Total, Asymmetry_Factor-Coarse, Asymmetry_Factor-Fine, 
+    Absorption_AOD, Single_Scattering_Albedo, 
+    Refractive_Index-Imaginary_Part, Refractive_Index-Real_Part, 
+    Scattering_Angle_Bin_3.2_to_<6_degrees, 
+    Scattering_Angle_Bin_30_to_<80_degrees,
+    Scattering_Angle_Bin_6_to_<30_degrees,
+    
+    Depolarization_Ratio, Lidar_Ratio,
+    AOD_Coincident_Input,]
     wavelength: wavelengths of interest to be interpolated/extrapolated.
     method: interpolation/extrapolation methods,
     choose among 'linear' (default), 'quadratic', 'cubic.
@@ -385,66 +399,64 @@ def AERONETwvlProcess(data, parameter, wavelength, method = 'linear'):
 # =============================================================================
 #     Initialization
 # =============================================================================
-    output = {}
-    for i, isite in enumerate(Data.keys()):
-        sys.stdout.write('\r Wavelength processing # %i/%i sites' % (i + 1, len(Data.keys())))
-        output[isite] = {'lat': Data[isite]['lat'], 'lon': Data[isite]['lon'], 'elev': Data[isite]['elev']}
-        data = Data[isite]['data'].copy()
-        processed = data.copy()
-        for ipara in POI:
-            columns = []
-            for ikey in data.keys():
-                if ikey.find(ipara) == 0: 
-                    columns.append(ikey)
-            paradata = data[columns]
-            """
-            Remove NaN columns (no measurement at this wavelength)
-            """
-            paradata = paradata.dropna(axis = 1, how = 'all')
-            """
-            Update wavelengths
-            """         
-            wvl = []
-            for ikey in paradata:
-                wvl.append(float(re.findall(r'\d+', ikey)[0]))
-            """
-            Interpolation/extrapolation
-            """
-            x = wvl
-            y = paradata
-            if len(y) > 0: 
-                f = interpolate.interp1d(x, y, kind = wvlProcessMethod, fill_value = 'extrapolate', bounds_error = False)
-                for iwvl in WOI:
-                    paraname = columns[0]
-                    paraname = paraname.replace(re.findall(r'\d+', columns[0])[0], str(iwvl))
-                    processed['%s' % (paraname)] = f(iwvl)
-                
-                """
-                Angstorm exponent:
-                If the parameter is AOT or AOTabsp, ignore the given method, use Angstorm exponent (AE) instead. 
-                Use nearby AOT/AOTabsp to calculate AE and predict the target wavelength.
-                """
-                wvl = sorted(wvl)
-                if ipara.find('AOT') >= 0: 
-                    for iwvl in WOI:
-                        for i in range(0, len(wvl) - 1):
-                            if int(iwvl) in range(int(wvl[i]), int(wvl[i + 1])): 
-                                if ipara == 'AOT':  
-                                    AE = Angstorm(wvl[i], paradata['AOT_%i' % (wvl[i])], wvl[i + 1], paradata['AOT_%i' % (wvl[i + 1])])
-                                    paraname = columns[0]
-                                    paraname = paraname.replace(re.findall(r'\d+', columns[0])[0], str(iwvl))
-                                    processed['%s' % (paraname)] = wvldepAOD(wvl[i], paradata['AOT_%i' % (wvl[i])], iwvl, AE)
-                                else:
-                                    AE = Angstorm(wvl[i], paradata['AOTAbsp%i-T' % (wvl[i])], wvl[i + 1], paradata['AOTAbsp%i-T' % (wvl[i + 1])])
-                                    paraname = columns[0]
-                                    paraname = paraname.replace(re.findall(r'\d+', columns[0])[0], str(iwvl))
-                                    processed['%s' % (paraname)] = wvldepAOD(wvl[i], paradata['AOTAbsp%i-T' % (wvl[i])], iwvl, AE)
-                                
-
-        """
-        output
-        """
-        output[isite]['data'] = processed                
+    parameterList, wvl = support_info['parameter'], support_info['wavelength'] 
+    
+    parameter_ = []
+    for ipara in parameterList:
+        if parameter in ipara:
+            parameter_.append(ipara)
+            
+    data_subset = data[parameter_]        
+    data_subset.columns = wvl
+    
+    WOI = sorted(list(set(wavelength) - set(wvl)) + wvl)
+    data_subset = data_subset.reindex(columns = WOI)
+    
+    data_subset = data_subset.T
+    
+#            paradata = paradata.dropna(axis = 1, how = 'all')
+# =============================================================================
+#   interpolation
+# =============================================================================
+#    data_subset.interpolate(method = method, limit_direction='forward')
+#            """
+#            Interpolation/extrapolation
+#            """
+#            x = wvl
+#            y = paradata
+#            if len(y) > 0: 
+#                f = interpolate.interp1d(x, y, kind = wvlProcessMethod, fill_value = 'extrapolate', bounds_error = False)
+#                for iwvl in WOI:
+#                    paraname = columns[0]
+#                    paraname = paraname.replace(re.findall(r'\d+', columns[0])[0], str(iwvl))
+#                    processed['%s' % (paraname)] = f(iwvl)
+#                
+#                """
+#                Angstorm exponent:
+#                If the parameter is AOT or AOTabsp, ignore the given method, use Angstorm exponent (AE) instead. 
+#                Use nearby AOT/AOTabsp to calculate AE and predict the target wavelength.
+#                """
+#                wvl = sorted(wvl)
+#                if ipara.find('AOT') >= 0: 
+#                    for iwvl in WOI:
+#                        for i in range(0, len(wvl) - 1):
+#                            if int(iwvl) in range(int(wvl[i]), int(wvl[i + 1])): 
+#                                if ipara == 'AOT':  
+#                                    AE = Angstorm(wvl[i], paradata['AOT_%i' % (wvl[i])], wvl[i + 1], paradata['AOT_%i' % (wvl[i + 1])])
+#                                    paraname = columns[0]
+#                                    paraname = paraname.replace(re.findall(r'\d+', columns[0])[0], str(iwvl))
+#                                    processed['%s' % (paraname)] = wvldepAOD(wvl[i], paradata['AOT_%i' % (wvl[i])], iwvl, AE)
+#                                else:
+#                                    AE = Angstorm(wvl[i], paradata['AOTAbsp%i-T' % (wvl[i])], wvl[i + 1], paradata['AOTAbsp%i-T' % (wvl[i + 1])])
+#                                    paraname = columns[0]
+#                                    paraname = paraname.replace(re.findall(r'\d+', columns[0])[0], str(iwvl))
+#                                    processed['%s' % (paraname)] = wvldepAOD(wvl[i], paradata['AOTAbsp%i-T' % (wvl[i])], iwvl, AE)
+#                                
+#
+# =============================================================================
+#         output
+# =============================================================================
+#        output[isite]['data'] = processed                
     return pd.DataFrame.from_dict(output)
 
 
@@ -477,7 +489,6 @@ def AERONETwvlProcess(data, parameter, wavelength, method = 'linear'):
     
 
 ROI = {'S':-90, 'N': 90, 'W': -180, 'E': 180}
-casedir = dataInputDir + 'AERONET/Global_2005-2018_v3/'
 
 t1 = time.time()
 caseName = 'CA2017-18'
@@ -491,12 +502,14 @@ parameter = ['AOD_Extinction-Total', 'AOD_Extinction-Fine','AOD_Extinction-Coars
 parameter = ['AOD_Extinction-Total', 
          'Single_Scattering_Albedo', 'Absorption_AOD'] 
 
-INV, support_info = AERONETinversion(caseName, startdate, enddate, parameter = parameter)
-INV_mean, INV_std = AERONETtimeProcess(INV, freq = 'day', window = True, span = ['13:00:00', '14:30:00'])
-parameter = ['AOD', 'Angstrom_Exponent']
-DS, support_info = AERONETdirectSun(caseName, startdate, enddate, parameter = parameter)
-DS_mean, DS_std = AERONETtimeProcess(DS, freq = 'day', window = True, span = ['13:00:00', '14:30:00'])
+INV, support_info = AERONETinversion(caseName, startdate, enddate, parameter = 'all')
+INV_mean, INV_std = AERONETtimeProcess(INV, freq = 'day', window = True, span = ['12:00:00', '15:00:00'])
 
+
+#parameter = ['AOD', 'Angstrom_Exponent']
+#DS, support_info = AERONETdirectSun(caseName, startdate, enddate, parameter = 'all')
+#DS_mean, DS_std = AERONETtimeProcess(DS, freq = 'day', window = True, span = ['12:00:00', '15:00:00'])
+#
 
 
 #INV_int = AERONETwvlProcess(INV, ['SSA', 'AOTAbsp'], [388, 440, 500, 532, 550], 'linear')

@@ -364,7 +364,7 @@ def AERONETtimeProcess(data, freq = 'day', window = False, **kwargs):
 # =============================================================================
 # AERONET wavelength interpolation/extrapolation
 # =============================================================================
-def AERONETwvlProcess(data, support_info, parameter, wavelength, method = 'linear'):
+def AERONETwvlProcess(data, support_info, parameter, wavelength, method = 'linear', useAE = True):
     """
     Function to process AERONET product.
     data: outputs of AERONETinversion or AERONETdirectSun.
@@ -402,23 +402,64 @@ def AERONETwvlProcess(data, support_info, parameter, wavelength, method = 'linea
     parameterList, wvl = support_info['parameter'], support_info['wavelength'] 
     
     parameter_ = []
+    AE = []
     for ipara in parameterList:
         if parameter in ipara:
             parameter_.append(ipara)
-            
+        if 'Angstrom' in ipara:
+            AE.append(ipara)
+             
     data_subset = data[parameter_]        
     data_subset.columns = wvl
     
     WOI = sorted(list(set(wavelength) - set(wvl)) + wvl)
     data_subset = data_subset.reindex(columns = WOI)
     
-    data_subset = data_subset.T
+#    data_subset = data_subset.T
     
-#            paradata = paradata.dropna(axis = 1, how = 'all')
 # =============================================================================
-#   interpolation
+#    Interpolation / extrapolation
 # =============================================================================
-#    data_subset.interpolate(method = method, limit_direction='forward')
+    def interpAOD(y):
+        tau_1, lambda1, lamda0, alpha = y
+        return
+    
+    def interpOthers(y):
+        x = wvl
+        f = interpolate.interp1d(x, y, kind = method, fill_value = 'extrapolate', bounds_error = False)
+        return f(wavelength)
+
+#    t1 = time.time()
+#    for i in range(len(data)):
+#        x, y = wvl, data_subset[wvl].iloc[i : i + 1]
+#        f = interpolate.interp1d(x, y, kind = method, fill_value = 'extrapolate', bounds_error = False)
+#        data_subset[wavelength] = f(wavelength)
+#    t2 = time.time()
+#    print('Time used: %1.2f s' % (t2 - t1))
+    if 'AOD' in parameter:
+        if useAE: 
+            if 'Absorption' in parameter:
+                for ipara in AE:
+                    if 'Absorption' in ipara:
+                        AAE = ipara # (440 - 870)
+                data_subset = list(map(interpAOD, y))
+            else:
+                AE 
+            
+         else:  
+             data_subset[wavelength] = list(map(interpOthers, data_subset[wvl].values))
+        
+        
+        
+    else:
+        data_subset[wavelength] = list(map(interpOthers, data_subset[wvl].values))
+    
+
+#    # plot check
+#    plt.figure()
+#    plt.plot(data_subset[wvl].iloc[-1], '.-')
+#    plt.scatter(wavelength, data_subset[wavelength].iloc[-1], marker = 'x')
+        
 #            """
 #            Interpolation/extrapolation
 #            """

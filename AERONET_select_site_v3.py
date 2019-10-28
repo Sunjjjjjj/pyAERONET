@@ -7,7 +7,7 @@ reading AERONET data
 
 
 ######### load python packages
-import os
+import os, sys
 import shutil
 import numpy as np
 import glob
@@ -21,10 +21,10 @@ import datetime
 # Case information 
 # =============================================================================
 #caseName = 'Global_2005-2018_v3'
-caseName = 'CA201712'
-caseName = 'AU201903'
-caseName = 'CA201811'
-caseName = 'SA201901'
+#caseName = 'CA201712'
+#caseName = 'AU201903'
+#caseName = 'CA201811'
+#caseName = 'SA201901'
 caseName = 'CAN201905'
 
 caseDir = '/nobackup/users/sunj/AERONET/%s/' % (caseName)
@@ -33,14 +33,16 @@ if not os.path.isdir(caseDir):
 
 #ROI = {'S':-90, 'N': 90, 'W': -180, 'E': 180}
 #ROI = {'S':30, 'N': 42.5, 'W': -130, 'E': -117.5}
-ROI = {'S': -50, 'N': -20, 'W': 130, 'E': 160}
-ROI = {'S': 40, 'N': 60, 'W': -125, 'E': -80}
-ROI = {'S': 20, 'N': 50, 'W': -140, 'E': -115}
-ROI = {'S': -15, 'N': 15, 'W': -20, 'E': 15}
+#ROI = {'S': -50, 'N': -20, 'W': 130, 'E': 160}
+#ROI = {'S': 40, 'N': 60, 'W': -125, 'E': -80}
+#ROI = {'S': 20, 'N': 50, 'W': -140, 'E': -115}
+#ROI = {'S': -15, 'N': 15, 'W': -20, 'E': 15}
 ROI = {'S': 40, 'N': 60, 'W': -120, 'E': -80}
 
-timeStart = '%4i-%02i-%02i %02i:%02i:%02i' % (2019, 5, 29, 0, 0, 0)
-timeEnd   = '%4i-%02i-%02i %02i:%02i:%02i' % (2019, 5, 30, 23, 59, 59)
+#timeStart = '%4i-%02i-%02i %02i:%02i:%02i' % (2019, 5, 29, 0, 0, 0)
+#timeEnd   = '%4i-%02i-%02i %02i:%02i:%02i' % (2019, 5, 30, 23, 59, 59)
+timestart = '%4i-%02i-%02i' % (2019, 5, 29)
+timeend   = '%4i-%02i-%02i' % (2019, 5, 30)
 
 # =============================================================================
 # AERONET site information
@@ -55,8 +57,7 @@ dslist = glob.glob(dsDir + '*lev*')
 
 #subprocess.call('rm ' + caseDir + '*.lev', shell = True)
 #subprocess.call('rm ' + caseDir + '*.lev*', shell = True)
-
-print('Searching inversion product...')
+sys.stdout.write('\r Searching site from AERONET inversion product...' )
 for invf in invlist[:]:
     aerData = pd.read_csv(invf, sep=",", header = 6)    
 
@@ -88,8 +89,8 @@ for i, ff in enumerate(sorted(filelist)[:]):
     for i in range(len(aerDatetime)):
         timeStamp.append(time.mktime(datetime.datetime.strptime(aerDatetime[i], '%d:%m:%Y %H:%M:%S').timetuple()))
     
-    tsstart = np.array(time.mktime(datetime.datetime.strptime(timeStart, '%Y-%m-%d %H:%M:%S').timetuple()))
-    tsend  =  np.array(time.mktime(datetime.datetime.strptime(timeEnd, '%Y-%m-%d %H:%M:%S').timetuple()))
+    tsstart = np.array(time.mktime(datetime.datetime.strptime(timestart, '%Y-%m-%d %H:%M:%S').timetuple()))
+    tsend  =  np.array(time.mktime(datetime.datetime.strptime(timeend, '%Y-%m-%d %H:%M:%S').timetuple()))
     tsrange = (timeStamp >= tsstart) & (timeStamp <= tsend)
     
     if len(aerData[tsrange]) == 0: 

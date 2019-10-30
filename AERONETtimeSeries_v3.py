@@ -27,9 +27,9 @@ dataOutputDir = '/nobackup/users/sunj/'
 dataInputDir = '/nobackup_1/users/sunj/'
 
 
-pwd = os.getcwd()
-dataOutputDir = pwd + '/'
-dataInputDir = pwd + '/'
+#pwd = os.getcwd()
+#dataOutputDir = pwd + '/'
+#dataInputDir = pwd + '/'
 
 # =============================================================================
 # inversion product
@@ -81,13 +81,13 @@ def AERONETinversion(caseName, startdate, enddate, parameter = 'all'):
         lag = round(data['Longitude(Degrees)'] / 15)
 
         dateTime = []
-        dataTimeLocal = []
+        dateTimeLocal = []
         for i in range(len(data)):
             temp = pd.to_datetime('%s %s' %(aerDate[i], aerTime[i]), format ='%d:%m:%Y %H:%M:%S')
             dateTime.append(temp)
-            dataTimeLocal.append(temp + np.sign(lag[i]) * pd.Timedelta(abs(lag[i]), 'h'))
+            dateTimeLocal.append(temp + np.sign(lag[i]) * pd.Timedelta(abs(lag[i]), 'h'))
         data['dateTime'] = dateTime
-        data['dateTimeLocal'] = dataTimeLocal
+        data['dateTimeLocal'] = dateTimeLocal
         data['timeStamp'] = data['dateTime'].values.astype(np.int64) // 10 ** 9
         data['timeStampLocal'] = data['dateTimeLocal'].values.astype(np.int64) // 10 ** 9
         del data['Date(dd:mm:yyyy)'], data['Time(hh:mm:ss)']
@@ -152,8 +152,11 @@ def AERONETinversion(caseName, startdate, enddate, parameter = 'all'):
 #     Output
 # =============================================================================
     # remove outliers
-    output[output == -999] = np.nan
-    support_info = {'parameter': parameterList, 'wavelength': wvl, 'particleSize': np.array(sorted(particleSize))}
+    try:
+        output[output == -999] = np.nan
+        support_info = {'parameter': parameterList, 'wavelength': wvl, 'particleSize': np.array(sorted(particleSize))}
+    except:
+        print('Error: no AERONET site available!')
     return output.reset_index(drop = True), support_info
     
 
@@ -210,13 +213,13 @@ def AERONETdirectSun(caseName, startdate, enddate, parameter = 'all'):
         lag = round(data['Longitude(Degrees)'] / 15)
 
         dateTime = []
-        dataTimeLocal = []
+        dateTimeLocal = []
         for i in range(len(data)):
             temp = pd.to_datetime('%s %s' %(aerDate[i], aerTime[i]), format ='%d:%m:%Y %H:%M:%S')
             dateTime.append(temp)
-            dataTimeLocal.append(temp + np.sign(lag[i]) * pd.Timedelta(abs(lag[i]), 'h'))
+            dateTimeLocal.append(temp + np.sign(lag[i]) * pd.Timedelta(abs(lag[i]), 'h'))
         data['dateTime'] = dateTime
-        data['dateTimeLocal'] = dataTimeLocal
+        data['dateTimeLocal'] = dateTimeLocal
         data['timeStamp'] = data['dateTime'].values.astype(np.int64) // 10 ** 9
         data['timeStampLocal'] = data['dateTimeLocal'].values.astype(np.int64) // 10 ** 9
         del data['Date(dd:mm:yyyy)'], data['Time(hh:mm:ss)']
@@ -436,24 +439,26 @@ def AERONETwvlProcess(data, support_info, parameter, wavelength, method = 'linea
 #        data_subset[wavelength] = f(wavelength)
 #    t2 = time.time()
 #    print('Time used: %1.2f s' % (t2 - t1))
-    if 'AOD' in parameter:
-        if useAE: 
-            if 'Absorption' in parameter:
-                for ipara in AE:
-                    if 'Absorption' in ipara:
-                        AAE = ipara # (440 - 870)
-                data_subset = list(map(interpAOD, y))
-            else:
-                AE 
-            
-         else:  
-             data_subset[wavelength] = list(map(interpOthers, data_subset[wvl].values))
-        
-        
-        
-    else:
+#    if 'AOD' in parameter:
+#        if useAE: 
+#            if 'Absorption' in parameter:
+#                for ipara in AE:
+#                    if 'Absorption' in ipara:
+#                        AAE = ipara # (440 - 870)
+#                data_subset = list(map(interpAOD, y))
+#            else:
+#                pass
+##                AE 
+##            
+#         else:
+#             pass
+##             data_subset[wavelength] = list(map(interpOthers, data_subset[wvl].values))
+#        
+#        
+#        
+#    else:
         data_subset[wavelength] = list(map(interpOthers, data_subset[wvl].values))
-    
+    data_subset[wavelength] = list(map(interpOthers, data_subset[wvl].values))
 
 #    # plot check
 #    plt.figure()
@@ -498,7 +503,9 @@ def AERONETwvlProcess(data, support_info, parameter, wavelength, method = 'linea
 #         output
 # =============================================================================
 #        output[isite]['data'] = processed                
-    return pd.DataFrame.from_dict(output)
+    output = pd.DataFrame.from_dict(data_subset)
+    output.reset_index(inplace = True)
+    return output
 
 
 # =============================================================================
@@ -529,22 +536,22 @@ def AERONETwvlProcess(data, support_info, parameter, wavelength, method = 'linea
 #    main()
     
 
-ROI = {'S':-90, 'N': 90, 'W': -180, 'E': 180}
-
-t1 = time.time()
-caseName = 'CA2017-18'
-
-startdate = '%4i-%02i-%02i' % (2019, 5, 1)
-enddate   = '%4i-%02i-%02i' % (2019, 5, 31) 
-
-parameter = ['AOD_Extinction-Total', 'AOD_Extinction-Fine','AOD_Extinction-Coarse', 
-         'Single_Scattering_Albedo', 'Absorption_AOD'] 
-
-parameter = ['AOD_Extinction-Total', 
-         'Single_Scattering_Albedo', 'Absorption_AOD'] 
-
-INV, support_info = AERONETinversion(caseName, startdate, enddate, parameter = 'all')
-INV_mean, INV_std = AERONETtimeProcess(INV, freq = 'day', window = True, span = ['12:00:00', '15:00:00'])
+#ROI = {'S':-90, 'N': 90, 'W': -180, 'E': 180}
+#
+#t1 = time.time()
+#caseName = 'NAF'
+#
+#startdate = '%4i-%02i-%02i' % (2019, 5, 1)
+#enddate   = '%4i-%02i-%02i' % (2019, 5, 31) 
+#
+#parameter = ['AOD_Extinction-Total', 'AOD_Extinction-Fine','AOD_Extinction-Coarse', 
+#         'Single_Scattering_Albedo', 'Absorption_AOD'] 
+#
+#parameter = ['AOD_Extinction-Total', 
+#         'Single_Scattering_Albedo', 'Absorption_AOD'] 
+#
+#INV, support_info = AERONETinversion(caseName, startdate, enddate, parameter = 'all')
+#INV_mean, INV_std = AERONETtimeProcess(INV, freq = 'day', window = False, span = ['12:00:00', '15:00:00'])
 
 
 #parameter = ['AOD', 'Angstrom_Exponent']
@@ -560,5 +567,5 @@ INV_mean, INV_std = AERONETtimeProcess(INV, freq = 'day', window = True, span = 
 #    pickle.dump(INV_int, handle, protocol=pickle.HIGHEST_PROTOCOL)
 #with open(casedir + 'DS_%4i.pickle' % (iyear), 'wb') as handle:
 #    pickle.dump(DS_int, handle, protocol=pickle.HIGHEST_PROTOCOL)
-t2 = time.time()
-print('Time: %1.2f s' % (t2 - t1))        
+#t2 = time.time()
+#print('Time: %1.2f s' % (t2 - t1))        

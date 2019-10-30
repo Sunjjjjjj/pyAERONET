@@ -98,8 +98,8 @@ def selectAERONET(caseName, startdate, enddate, ROI):
                 subprocess.call('rm ' + caseDir + '*%s*' % (site), shell = True)
                 pass
         #If direct sun is not available for the same site, then the corresponding inversion is removed.
-        else:
-            subprocess.call('rm ' + caseDir + '*%s*' % (site), shell = True)
+#        else:
+#            subprocess.call('rm ' + caseDir + '*%s*' % (site), shell = True)
 # =============================================================================
 # check rudundent Inversion data
 # =============================================================================
@@ -121,7 +121,8 @@ def selectAERONET(caseName, startdate, enddate, ROI):
 #caseName = 'AU201903'
 #caseName = 'CA201811'
 #caseName = 'SA201901'
-caseName = 'CAN201906'
+#cases = ['ECN', 'NAF', 'CPC', 'ATA', 'SAF']
+
 
 #ROI = {'S':-90, 'N': 90, 'W': -180, 'E': 180}
 #ROI = {'S':30, 'N': 42.5, 'W': -130, 'E': -117.5}
@@ -131,11 +132,18 @@ caseName = 'CAN201906'
 #ROI = {'S': -15, 'N': 15, 'W': -20, 'E': 15}
 ROI = {'S': 40, 'N': 60, 'W': -120, 'E': -80}
 
-startdate = '%4i-%02i-%02i' % (2019, 5, 29)
-enddate   = '%4i-%02i-%02i' % (2019, 5, 30)
+ROIs = np.load(dataOutputDir + 'P3_output/ROIs.npy').reshape(-1)[0]
+
+
+
+
+startdate = '%4i-%02i-%02i' % (2006, 1, 1)
+enddate   = '%4i-%02i-%02i' % (2016, 12, 31)
 
 # =============================================================================
 # AERONET site information
 # =============================================================================
-selectAERONET(caseName, startdate, enddate, ROI)
+for caseName in ['CPC']:
+    ROI = ROIs[caseName]
+    selectAERONET(caseName, startdate, enddate, ROI)
 

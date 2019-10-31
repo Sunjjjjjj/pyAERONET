@@ -39,12 +39,15 @@ def AERONETinversion(caseName, startdate, enddate, parameter = 'all'):
     Function to read AERONET Inversion version 3 product.
     
     caseName: the name of the folder containing AEROPNET sites to be used. 
+    
     starttime/endtime: select data within a peroid (closed interval), format 
     in "YYYY-MM-DD".
-    parameter: if 'all' (default), then retrieve all parameters in the original 
-    AERONET data file; else, choose parameters of interest. The following list 
-    contains the most used parameters. If users are interested in other 
-    parameters, please find the full parameters list returned by the function. 
+    
+    parameter: a list of parameters of interest. If 'all' (default), then 
+    retrieve all parameters in the original AERONET data file; else, choose 
+    parameters of interest. The following list contains the most used 
+    parameters. If users are interested in other parameters, please find the 
+    full parameters list returned by the function. 
     most used parameters:
         ['AOD_Extinction-Total', 'AOD_Extinction-Fine','AOD_Extinction-Coarse', 
          'Single_Scattering_Albedo', 'Absorption_AOD',
@@ -154,7 +157,7 @@ def AERONETinversion(caseName, startdate, enddate, parameter = 'all'):
     # remove outliers
     try:
         output[output == -999] = np.nan
-        support_info = {'parameter': parameterList, 'wavelength': wvl, 'particleSize': np.array(sorted(particleSize))}
+        support_info = {'parameter': parameterList, 'wavelength': sorted(wvl), 'particleSize': np.array(sorted(particleSize))}
     except:
         print('Error: no AERONET site available!')
     return output.reset_index(drop = True), support_info
@@ -169,13 +172,16 @@ def AERONETdirectSun(caseName, startdate, enddate, parameter = 'all'):
     """
     Function to read AERONET direct sun version 3 product.
     
-    caseName: the name of the folder containing AEROPNET sites to be used. 
+    caseName: the name of the folder containing AEROPNET sites to be used.
+    
     starttime/endtime: select data within a peroid (closed interval), format 
     in "YYYY-MM-DD".
-    parameter: if 'all'(default), then retrieve all parameters in the original 
-    AERONET data file; else, choose parameters of interest. The following list 
-    contains the most used parameters. If users are interested in other 
-    parameters, please find the full parameters list returned by the function. 
+    
+    parameter: a list of parameters of interest. If 'all'(default), then 
+    retrieve all parameters in the original AERONET data file; else, choose 
+    parameters of interest. The following list contains the most used 
+    parameters. If users are interested in other parameters, please find the 
+    full parameters list returned by the function. 
     most used parameters:
         ['AOD', 'Angstrom_Exponent', 
          ...]
@@ -274,7 +280,7 @@ def AERONETdirectSun(caseName, startdate, enddate, parameter = 'all'):
 #         Output
 # =============================================================================
     output[output == -999] = np.nan
-    support_info = {'parameter': parameterList, 'wavelength': np.array(sorted(wvl))}
+    support_info = {'parameter': parameterList, 'wavelength': sorted(wvl)}
     return output.reset_index(drop = True), support_info
 
 
@@ -367,26 +373,29 @@ def AERONETtimeProcess(data, freq = 'day', window = False, **kwargs):
 # =============================================================================
 # AERONET wavelength interpolation/extrapolation
 # =============================================================================
-def AERONETwvlProcess(data, support_info, parameter, wavelength, method = 'linear', useAE = True):
+def AERONETwvlProcess(data, support_info, parameter, wavelength, method = 'linear'):
     """
     Function to process AERONET product.
-    data: outputs of AERONETinversion or AERONETdirectSun.
-    parameter: parameters of interest. Select from the following parameters: 
+    data and support_info: outputs of AERONETinversion or AERONETdirectSun.
+    
+    parameter: a parameter of interest. The parameter should be 
+    wavelength-dependent. The following list contains the most used parameters. 
+    If users are interested in other parameters, please find the full 
+    parameters list returned by AERONETinversion or AERONETdirectSun. 
+    most used parameters:
     [AOD_Extinction-Total, AOD_Extinction-Coarse, AOD_Extinction-Fine, 
     symmetry_Factor-Total, Asymmetry_Factor-Coarse, Asymmetry_Factor-Fine, 
     Absorption_AOD, Single_Scattering_Albedo, 
     Refractive_Index-Imaginary_Part, Refractive_Index-Real_Part, 
-    Scattering_Angle_Bin_3.2_to_<6_degrees, 
-    Scattering_Angle_Bin_30_to_<80_degrees,
-    Scattering_Angle_Bin_6_to_<30_degrees,
+    ...]
     
-    Depolarization_Ratio, Lidar_Ratio,
-    AOD_Coincident_Input,]
-    wavelength: wavelengths of interest to be interpolated/extrapolated.
-    method: interpolation/extrapolation methods,
-    choose among 'linear' (default), 'quadratic', 'cubic.
-    If the parameter is AOT or AOTabsp, the Angstorm Exponent will be used instead of given method.
+    wavelength: wavelengths of interest to be interpolated/extrapolated. It can
+    be a single band or a list of wavelengths.
     
+    
+    method: interpolation/extrapolation methods. Choose among 
+    'linear' (default), 'nearest', 'quadratic', 'cubic', and 'AngstromExponent' 
+    (only applicable to AOD or Absorption_AOD).
     
     
     Return: 
@@ -396,115 +405,133 @@ def AERONETwvlProcess(data, support_info, parameter, wavelength, method = 'linea
     
     
     @author: Sunji
-    Last updated date: 2019-10-25
+    Last updated date: 2019-10-31
     """
 
 # =============================================================================
 #     Initialization
 # =============================================================================
+    # retrieve informaton
     parameterList, wvl = support_info['parameter'], support_info['wavelength'] 
-    
+    # retrieve wavelength-dependent parameter and Angstrom Exponent
     parameter_ = []
-    AE = []
+#    AE = []
     for ipara in parameterList:
-        if parameter in ipara:
+        # retrieve the parameter of interest at different wavelength
+        if ipara.startswith(parameter) & ('nm' in ipara):
             parameter_.append(ipara)
-        if 'Angstrom' in ipara:
-            AE.append(ipara)
-             
+#        # retrieve Angstrom Exponent
+#        if ipara.endswith('Angstrom_Exponent') | ipara.startswith('Absorption_Angstrom_Exponent'):
+#            if (~data[ipara].isnull()).any():
+#                AE.append(ipara)
     data_subset = data[parameter_]        
     data_subset.columns = wvl
     
-    WOI = sorted(list(set(wavelength) - set(wvl)) + wvl)
+
+    # a list of wavelength at which parameter is to be interpolated
+    wavelength = list(map(float, wavelength))
+    
+    WOI = sorted(list(set(wavelength) - set(wvl)) + list(wvl))
     data_subset = data_subset.reindex(columns = WOI)
-    
+#    data_subset['Site'] = data.Site
 #    data_subset = data_subset.T
-    
+#    wvl[data_subset.isnull().all(axis = 0)]
 # =============================================================================
-#    Interpolation / extrapolation
+#    sub functinos
 # =============================================================================
-    def interpAOD(y):
-        tau_1, lambda1, lamda0, alpha = y
-        return
+    def interpAOD(tau0, lambda0, lambda1, alpha):
+#        tau0, lambda1, lambda0, alpha
+        return tau0 * (lambda1 / lambda0) ** (-alpha)
     
     def interpOthers(y):
         x = wvl
         f = interpolate.interp1d(x, y, kind = method, fill_value = 'extrapolate', bounds_error = False)
         return f(wavelength)
-
-#    t1 = time.time()
-#    for i in range(len(data)):
-#        x, y = wvl, data_subset[wvl].iloc[i : i + 1]
-#        f = interpolate.interp1d(x, y, kind = method, fill_value = 'extrapolate', bounds_error = False)
-#        data_subset[wavelength] = f(wavelength)
-#    t2 = time.time()
-#    print('Time used: %1.2f s' % (t2 - t1))
-#    if 'AOD' in parameter:
-#        if useAE: 
-#            if 'Absorption' in parameter:
-#                for ipara in AE:
-#                    if 'Absorption' in ipara:
-#                        AAE = ipara # (440 - 870)
-#                data_subset = list(map(interpAOD, y))
-#            else:
-#                pass
-##                AE 
-##            
-#         else:
-#             pass
-##             data_subset[wavelength] = list(map(interpOthers, data_subset[wvl].values))
-#        
-#        
-#        
-#    else:
+# =============================================================================
+#   Interpolation / extrapolation
+# =============================================================================
+    """
+    Notice for using AngstromExponent to interpolate AOD or Absorption_AOD: 
+    AERONET measuring bands may differ from one site to another, the 
+    Angstrom Exponent may also available in different wavelength windows. 
+    Thus, the wavelength processing for each site should be processed 
+    individually. For each wavelengths of interest (iwvl), the step is as 
+    following:
+        1) Check whether iwvl is in the range of measuring band.
+        2) Check whether iwvl is in the range of Angstrom Exponent wavelength windows. 
+    
+    """
+    if method == 'AngstromExponent': 
+        if 'AOD' in parameter:
+            
+            for isite in list(set(data.Site)):
+                mask = (data.Site == isite)
+                AE = []
+                for ipara in parameterList:
+                    # retrieve Angstrom Exponent
+                    if ipara.endswith('Angstrom_Exponent') | ipara.startswith('Absorption_Angstrom_Exponent'):
+                        if (~data[mask][ipara].isnull()).any():
+                            AE.append(ipara)
+                temp = []
+                for ipara in AE: 
+                    temp.append([float(re.findall("\d+", ipara)[0]), float(re.findall("\d+", ipara)[1])])
+                AE = pd.DataFrame(temp, index = AE, columns = ['bin1', 'bin2'])
+                # wavelengths 
+                wvl_obs = np.array(sorted(data_subset[mask].columns[(~data_subset[mask].isnull()).any()]))
+            
+                for iwvl in wavelength:
+                    if (iwvl < wvl_obs.min()):  
+                        ipara = AE.idxmin().bin1
+                        alpha = data[mask][ipara]
+                        print('Warning: %.1f is outside the measuring band of %s from %.1f to %.1f nm, \
+                              use %s.' % (iwvl, isite, wvl_obs.min(), wvl_obs.max(), ipara))
+                        idx = np.argmin(abs(wvl_obs - iwvl))
+                        tau0 = data_subset[mask][float(wvl_obs[idx])]
+                        lambda0 = np.ones(mask.sum()) * wvl_obs[idx]
+                        lambda1 = np.ones(mask.sum()) * iwvl
+                        data_subset.loc[mask, float(iwvl)] = interpAOD(tau0, lambda0, lambda1, alpha)
+                        
+                    if (iwvl > wvl_obs.max()):
+                        ipara = AE.idxmax().bin2
+                        alpha = data[mask][ipara]
+                        print('Warning: %.1f is outside the measuring band of %s from %.1f to %.1f nm, \
+                              use %s.' % (iwvl, isite, wvl_obs.min(), wvl_obs.max(), ipara))
+                        idx = np.argmin(abs(wvl_obs - iwvl))
+                        tau0 = data_subset[mask][float(wvl_obs[idx])]
+                        lambda0 = np.ones(mask.sum()) * wvl_obs[idx]
+                        lambda1 = np.ones(mask.sum()) * iwvl
+                        data_subset.loc[mask, float(iwvl)] = interpAOD(tau0, lambda0, lambda1, alpha)
+                    if (iwvl >= wvl_obs.min()) & (iwvl <= wvl_obs.max()):
+                        try:
+                            ipara = (abs(AE[(iwvl >= AE.bin1) & (iwvl <= AE.bin2)] - iwvl).sum(axis = 1)).idxmin()
+                            ipara = (abs(AE - iwvl).sum(axis = 1)).idxmin()
+                        except:
+                            if iwvl < AE.bin1.min():
+                                ipara = AE.idxmin().bin1
+                            if iwvl > AE.bin2.max():
+                                ipara = AE.idxmax().bin2
+                            print('Warning: %.1f is outside the Angstrom Exponent covered wavelength of %s from %.1f to %.1f nm, \
+                                  use %s.' % (iwvl, isite, AE.bin1.min(), AE.bin2.max(), ipara))
+#                        for ipara in AE.index:
+#                            bin1, bin2 = AE.loc[ipara].bin1, AE.loc[ipara].bin2
+                        alpha = data[mask][ipara]
+#                            if (iwvl >= bin1) & (iwvl <= bin2):
+                        idx = np.argmin(abs(wvl_obs - iwvl))
+                        tau0 = data_subset[mask][float(wvl_obs[idx])]
+                        lambda0 = np.ones(mask.sum()) * wvl_obs[idx]
+                        lambda1 = np.ones(mask.sum()) * iwvl
+                        data_subset.loc[mask, float(iwvl)] = interpAOD(tau0, lambda0, lambda1, alpha)
+        else:
+            raise Exception('AngstromExponent method is only applicable to AOD and Absorption_AOD!')
+    else:
         data_subset[wavelength] = list(map(interpOthers, data_subset[wvl].values))
-    data_subset[wavelength] = list(map(interpOthers, data_subset[wvl].values))
-
-#    # plot check
-#    plt.figure()
-#    plt.plot(data_subset[wvl].iloc[-1], '.-')
-#    plt.scatter(wavelength, data_subset[wavelength].iloc[-1], marker = 'x')
-        
-#            """
-#            Interpolation/extrapolation
-#            """
-#            x = wvl
-#            y = paradata
-#            if len(y) > 0: 
-#                f = interpolate.interp1d(x, y, kind = wvlProcessMethod, fill_value = 'extrapolate', bounds_error = False)
-#                for iwvl in WOI:
-#                    paraname = columns[0]
-#                    paraname = paraname.replace(re.findall(r'\d+', columns[0])[0], str(iwvl))
-#                    processed['%s' % (paraname)] = f(iwvl)
-#                
-#                """
-#                Angstorm exponent:
-#                If the parameter is AOT or AOTabsp, ignore the given method, use Angstorm exponent (AE) instead. 
-#                Use nearby AOT/AOTabsp to calculate AE and predict the target wavelength.
-#                """
-#                wvl = sorted(wvl)
-#                if ipara.find('AOT') >= 0: 
-#                    for iwvl in WOI:
-#                        for i in range(0, len(wvl) - 1):
-#                            if int(iwvl) in range(int(wvl[i]), int(wvl[i + 1])): 
-#                                if ipara == 'AOT':  
-#                                    AE = Angstorm(wvl[i], paradata['AOT_%i' % (wvl[i])], wvl[i + 1], paradata['AOT_%i' % (wvl[i + 1])])
-#                                    paraname = columns[0]
-#                                    paraname = paraname.replace(re.findall(r'\d+', columns[0])[0], str(iwvl))
-#                                    processed['%s' % (paraname)] = wvldepAOD(wvl[i], paradata['AOT_%i' % (wvl[i])], iwvl, AE)
-#                                else:
-#                                    AE = Angstorm(wvl[i], paradata['AOTAbsp%i-T' % (wvl[i])], wvl[i + 1], paradata['AOTAbsp%i-T' % (wvl[i + 1])])
-#                                    paraname = columns[0]
-#                                    paraname = paraname.replace(re.findall(r'\d+', columns[0])[0], str(iwvl))
-#                                    processed['%s' % (paraname)] = wvldepAOD(wvl[i], paradata['AOTAbsp%i-T' % (wvl[i])], iwvl, AE)
-#                                
 #
 # =============================================================================
 #         output
 # =============================================================================
 #        output[isite]['data'] = processed                
     output = pd.DataFrame.from_dict(data_subset)
-    output.reset_index(inplace = True)
+    output.reset_index(drop = True)
     return output
 
 
@@ -536,28 +563,27 @@ def AERONETwvlProcess(data, support_info, parameter, wavelength, method = 'linea
 #    main()
     
 
-#ROI = {'S':-90, 'N': 90, 'W': -180, 'E': 180}
-#
-#t1 = time.time()
-#caseName = 'NAF'
-#
-#startdate = '%4i-%02i-%02i' % (2019, 5, 1)
-#enddate   = '%4i-%02i-%02i' % (2019, 5, 31) 
-#
-#parameter = ['AOD_Extinction-Total', 'AOD_Extinction-Fine','AOD_Extinction-Coarse', 
-#         'Single_Scattering_Albedo', 'Absorption_AOD'] 
-#
-#parameter = ['AOD_Extinction-Total', 
-#         'Single_Scattering_Albedo', 'Absorption_AOD'] 
-#
-#INV, support_info = AERONETinversion(caseName, startdate, enddate, parameter = 'all')
+ROI = {'S':-90, 'N': 90, 'W': -180, 'E': 180}
+
+t1 = time.time()
+caseName = 'NAF'
+
+startdate = '%4i-%02i-%02i' % (2010, 1, 1)
+enddate   = '%4i-%02i-%02i' % (2010, 12, 31) 
+
+parameter = ['AOD_Extinction-Total', 'AOD_Extinction-Fine','AOD_Extinction-Coarse', 
+         'Single_Scattering_Albedo', 'Absorption_AOD'] 
+
+parameter = ['AOD_Extinction-Total', 
+         'Single_Scattering_Albedo', 'Absorption_AOD'] 
+
+#INV, support_info1 = AERONETinversion(caseName, startdate, enddate, parameter = 'all')
 #INV_mean, INV_std = AERONETtimeProcess(INV, freq = 'day', window = False, span = ['12:00:00', '15:00:00'])
-
-
-#parameter = ['AOD', 'Angstrom_Exponent']
-#DS, support_info = AERONETdirectSun(caseName, startdate, enddate, parameter = 'all')
+#para = AERONETwvlProcess(INV, support_info1, 'Single_Scattering_Albedo', [550.], method = 'linear')
+#parameter = ['AOD']
+#DS, support_info2 = AERONETdirectSun(caseName, startdate, enddate, parameter = 'all')
 #DS_mean, DS_std = AERONETtimeProcess(DS, freq = 'day', window = True, span = ['12:00:00', '15:00:00'])
-#
+para = AERONETwvlProcess(DS, support_info2, 'AOD', [340., 380.,388,  550.], method = 'AngstromExponent')
 
 
 #INV_int = AERONETwvlProcess(INV, ['SSA', 'AOTAbsp'], [388, 440, 500, 532, 550], 'linear')

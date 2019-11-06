@@ -11,7 +11,7 @@ import sys, os
 import time
 import numpy as np
 import numpy.ma as ma
-import matplotlib.pyplot as plt
+import matplotlib.pyplot as pltport 
 import matplotlib.dates as mdates
 import glob
 import pandas as pd
@@ -27,9 +27,9 @@ dataOutputDir = '/nobackup/users/sunj/'
 dataInputDir = '/nobackup_1/users/sunj/'
 
 
-pwd = os.getcwd()
-dataOutputDir = pwd + '/'
-dataInputDir = pwd + '/'
+#pwd = os.getcwd()
+#dataOutputDir = pwd + '/'
+#dataInputDir = pwd + '/'
 
 # =============================================================================
 # inversion product
@@ -403,7 +403,7 @@ def AERONETwvlProcess(data, support_info, parameter, wvl_int, method = 'linear')
     Refractive_Index-Imaginary_Part, Refractive_Index-Real_Part, 
     ...]
     
-    wvl_int: wavelengths of interest to be interpolated/extrapolated. It can
+    wvl_int: a list of wavelengths of interest to be interpolated/extrapolated. It can
     be a single band or a list of wavelengths.
     
     
@@ -533,7 +533,7 @@ def AERONETwvlProcess(data, support_info, parameter, wvl_int, method = 'linear')
                         alpha = data[mask][ipara]
                         idx = np.argmin(abs(wvl_obs - iwvl))
                         if iwvl > wvl_obs.max():
-                            print('Warning: %.1f is outside the measuring band of %s from %.1f to %.1f nm, interpolated by %.1f.' \
+                            print('Warning: %.1f is outside the measuring band of %s from %.1f to %.1f nm, interpolated by %.1f nm.' \
                                   % (iwvl, isite, wvl_obs.min(), wvl_obs.max(), wvl_obs[idx]))
                         tau0 = data_subset[mask][float(wvl_obs[idx])]
                         lambda0 = wvl_obs[idx]
@@ -550,8 +550,8 @@ def AERONETwvlProcess(data, support_info, parameter, wvl_int, method = 'linear')
                         alpha = data[mask][ipara]
 
                         idx = np.argmin(abs(wvl_obs - iwvl))
-                        print('Warning: %.1f is interpolated by %s and %.1f.' \
-                              % (iwvl, ipara, wvl_obs[idx]))
+#                        print('%.1f nm is interpolated by %s and %.1f nm.' \
+#                              % (iwvl, ipara, wvl_obs[idx]))
 
                         tau0 = data_subset[mask][float(wvl_obs[idx])]
                         lambda0 = wvl_obs[idx]
@@ -598,27 +598,38 @@ def AERONETwvlProcess(data, support_info, parameter, wvl_int, method = 'linear')
 #if __name__ == '__main__':
 #    main()
     
-#
-#ROI = {'S':-90, 'N': 90, 'W': -180, 'E': 180}
-#
-#t1 = time.time()
-caseName = 'CA2017-18'
-
-startdate = '%4i-%02i-%02i' % (2017, 1, 1)
-enddate   = '%4i-%02i-%02i' % (2018, 12, 31) 
 
 
-parameter = ['Single_Scattering_Albedo', 'Absorption_AOD'] 
+##ROI = {'S':-90, 'N': 90, 'W': -180, 'E': 180}
+##
+t1 = time.time()
+caseName = 'CA2019-01'
+#caseName = 'Global_2005-2018_v3'
 
-INV, support_info1 = AERONETinversion(caseName, [startdate, enddate], parameter = 'all')
+startdate = '%4i-%02i-%02i' % (2019, 1, 1)
+enddate   = '%4i-%02i-%02i' % (2019, 1, 31) 
+
+parameter = ['Single_Scattering_Albedo', 'Absorption_AOD', 'Asymmetry_Factor-Total', 'Angstrom_Exponent',
+             'Refractive_Index-Real_Part', 'Refractive_Index-Imaginary_Part'] 
+INV, support_info1 = AERONETinversion(caseName, [startdate, enddate], parameter = parameter)
 INV_mean, INV_std = AERONETtimeProcess(INV, freq = 'day', window = False, span = ['12:00:00', '15:00:00'])
-para = AERONETwvlProcess(INV, support_info1, 'Single_Scattering_Albedo', [550.], method = 'linear')
+para = AERONETwvlProcess(INV, support_info1, 'Single_Scattering_Albedo', [380, 550.], method = 'linear')
+#INV['Single_Scattering_Albedo[550nm]'] = AERONETwvlProcess(INV, support_info1, 'Single_Scattering_Albedo', [550.], method = 'linear')[float(550)]
+#INV['Absorption_AOD[550nm]'] = AERONETwvlProcess(INV, support_info1, 'Absorption_AOD', [550.], method = 'AngstromExponent')[float(550)]
+#INV['Asymmetry_Factor-Total[550nm]'] = AERONETwvlProcess(INV, support_info1, 'Asymmetry_Factor-Total', [550.], method = 'linear')[float(550)]
+#INV['Refractive_Index-Real_Part[550nm]'] = AERONETwvlProcess(INV, support_info1, 'Refractive_Index-Real_Part', [550.], method = 'linear')[float(550)]
+#INV['Refractive_Index-Imaginary_Part[550nm]'] = AERONETwvlProcess(INV, support_info1, 'Refractive_Index-Imaginary_Part', [550.], method = 'linear')[float(550)]
+#INV.to_pickle(dataInputDir + 'AERONET/INV_2006-2016.pickle')
 
-parameter = ['AOD']
-DS, support_info2 = AERONETdirectSun(caseName, [startdate, enddate], parameter = 'all')
+
+parameter = ['AOD', 'Angstrom_Exponent', 'Solar_Zenith_Angle(Degrees) ']
+DS, support_info2 = AERONETdirectSun(caseName, [startdate, enddate], parameter = parameter)
 DS_mean, DS_std = AERONETtimeProcess(DS, freq = 'day', window = True, span = ['12:00:00', '15:00:00'])
-para = AERONETwvlProcess(DS, support_info2, 'AOD', [300., 430., 550., 880.], method = 'AngstromExponent')
+para = AERONETwvlProcess(DS, support_info2, 'AOD', [340, 380, 500, 550], method = 'AngstromExponent')
+#DS['AOD_550nm'] = AERONETwvlProcess(DS, support_info2, 'AOD', [550.], method = 'AngstromExponent')[float(550)]
+#DS.to_pickle(dataInputDir + 'AERONET/DS_2012-2016.pickle')
 
 
 
-#print('Time: %1.2f s' % (t2 - t1))        
+t2 = time.time()
+print('Time: %1.2f s' % (t2 - t1))        

@@ -574,7 +574,7 @@ def AERONETwvlProcess(data, support_info, parameter, wvl_int, method = 'linear')
 # =============================================================================
 # 
 # =============================================================================
-def AERONETcollocation(data1, data2, dates, timeWindow, Range):
+def AERONETcollocation(data1, data2, data3, dates, timeWindow, Range):
     """
     Collocate AERONET with satellite / model data.
     
@@ -586,35 +586,40 @@ def AERONETcollocation(data1, data2, dates, timeWindow, Range):
     except:
         startdate = enddate = dates[0]
 
+    data1 = data1.rename(columns={"dateTime": "dateTime(INV)", "timeStamp": "timeStamp(INV)"})
+    DSparameter = list(set(data2) - set(['dateTime', 'dateTimeLocal', 'timeStamp', 'timeStampLocal', 'Site', 'Latitude(Degrees)', 'Longitude(Degrees)', 'Elevation(m)']))
 
     COL = pd.DataFrame()
     dates = pd.date_range(startdate, enddate)
     for idate in dates:
-        mask = (data1['dateTime'].dt.date == idate.date())
+        mask = (data1['dateTime(INV)'].dt.date == idate.date())
         data1_day = data1[mask].reset_index(drop = True)
         mask = (data2['dateTime'].dt.date == idate.date())
         data2_day = data2[mask].reset_index(drop = True)
+        mask = (data3['dateTime'].dt.date == idate.date())
+        data3_day = data3[mask].reset_index(drop = True)
         
-        if len(data1_day) * len(data2_day) > 0:
+        if len(data1_day) * len(data2_day) * len(data3_day) > 0:
             for i in range(len(data1_day)):
                 lat1, lon1 = data1_day.iloc[i: i + 1]['Latitude(Degrees)'].values, data1_day.iloc[i: i + 1]['Longitude(Degrees)'].values
-                lat2, lon2 =  data2_day.lat.values, data2_day.lon.values
+                lat2, lon2 =  data3_day.lat.values, data3_day.lon.values
                 distance = geoDistance(lat1, lon1, lat2, lon2) # unit: km
-                dTime = abs(data1_day.iloc[i: i + 1]['timeStamp'].values - data2_day['timeStamp'].values) # unit: s
-                data2_day['dTime'] = dTime
+                dTime = abs(data1_day.iloc[i: i + 1]['timeStamp(INV)'].values - data3_day['timeStamp'].values) # unit: s
+                data3_day['dTime'] = dTime
                 mask1 = (distance <= Range) & (dTime <= timeWindow) # radius: 50 km, time window: +/-3 hr
                 
                 if any(mask1):
-#                    DS_subset = DS_day[DS_day.Site == INV_day.iloc[i].Site].reset_index(drop = True)
-#                    dTime =  abs(INV_day.iloc[i: i + 1]['timeStamp(INV)'].values - DS_subset.timeStamp.values) # unit: s 
-#                    
-#                    mask2 = (dTime <= 0.5 * 3600)  # time winder: +/-30 min
-#                    if any(mask2):
-#                        DS_subset = DS_subset[mask2].mean().to_frame().T[DSparameter]
+                    DS_subset = data2_day[data2_day.Site == data1_day.iloc[i].Site].reset_index(drop = True)
+                    dTime =  abs(data1_day.iloc[i: i + 1]['timeStamp(INV)'].values - DS_subset.timeStamp.values) # unit: s 
                     
-                    COL = COL.append(pd.concat([data2_day[mask1].mean().to_frame().T,\
-                                                data1_day.iloc[i: i + 1].reset_index(drop = True)], axis = 1))
-        COL = COL.reset_index(drop = True)
+                    mask2 = (dTime <= 0.5 * 3600)  # time winder: +/-30 min
+                    if any(mask2):
+                        DS_subset = DS_subset[mask2].mean().to_frame().T[DSparameter]
+                    
+                        COL = COL.append(pd.concat([data3_day[mask1].mean().to_frame().T,\
+                                                    data1_day.iloc[i: i + 1].reset_index(drop = True), \
+                                                    DS_subset], axis = 1))
+    COL = COL.reset_index(drop = True)
     return COL
 # =============================================================================
 # Test code

@@ -106,9 +106,7 @@ def selectAERONET(caseName, startdate, enddate, ROI):
     dslist = glob.glob(caseDir + '*lev*')
     invlist = glob.glob(caseDir + '*.all')
     
-    print('Total %i sites selected' %(len(dslist) + len(invlist)))
-    print('Number of direct sun data %i' % (len(dslist)))  
-    print('Number of inversion data %i' % (len(invlist)))
+    print('Total %i file selected (direct sun: %i, inversin: %i)' %(len(dslist) + len(invlist), len(dslist), len(invlist)))
     t2 = time.time() 
     print('Time of selecting:',t2 - t1,'s')
     
@@ -116,7 +114,7 @@ def selectAERONET(caseName, startdate, enddate, ROI):
 # =============================================================================
 # Case information 
 # =============================================================================
-#caseName = 'Global_2005-2018_v3'
+caseName = 'Global_2005-2019'
 #caseName = 'CA201712'
 #caseName = 'AU201903'
 #caseName = 'CA201811'
@@ -124,26 +122,27 @@ def selectAERONET(caseName, startdate, enddate, ROI):
 #cases = ['ECN', 'NAF', 'CPC', 'ATA', 'SAF']
 
 
-#ROI = {'S':-90, 'N': 90, 'W': -180, 'E': 180}
+ROI = {'S':-90, 'N': 90, 'W': -180, 'E': 180}
 #ROI = {'S':30, 'N': 42.5, 'W': -130, 'E': -117.5}
 #ROI = {'S': -50, 'N': -20, 'W': 130, 'E': 160}
 #ROI = {'S': 40, 'N': 60, 'W': -125, 'E': -80}
 #ROI = {'S': 20, 'N': 50, 'W': -140, 'E': -115}
 #ROI = {'S': -15, 'N': 15, 'W': -20, 'E': 15}
-ROI = {'S': 40, 'N': 60, 'W': -120, 'E': -80}
+#ROI = {'S': 40, 'N': 60, 'W': -120, 'E': -80}
 
-ROIs = np.load(dataOutputDir + 'P3_output/ROIs.npy').reshape(-1)[0]
-
-
+#ROIs = np.load(dataOutputDir + 'P3_output/ROIs.npy').reshape(-1)[0]
 
 
-startdate = '%4i-%02i-%02i' % (2006, 1, 1)
-enddate   = '%4i-%02i-%02i' % (2016, 12, 31)
 
+
+startdate = '%4i-%02i-%02i' % (2005, 1, 1)
+enddate   = '%4i-%02i-%02i' % (2019, 12, 31)
 # =============================================================================
 # AERONET site information
 # =============================================================================
-for caseName in ['CPC']:
-    ROI = ROIs[caseName]
-    selectAERONET(caseName, startdate, enddate, ROI)
+selectAERONET(caseName, startdate, enddate, ROI)
+
+#for caseName in ['CPC']:
+#    ROI = ROIs[caseName]
+#    selectAERONET(caseName, startdate, enddate, ROI)
 

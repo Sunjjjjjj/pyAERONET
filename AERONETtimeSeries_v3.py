@@ -570,11 +570,51 @@ def AERONETwvlProcess(data, support_info, parameter, wvl_int, method = 'linear')
     output.reset_index(drop = True)
     return output
 
+# =============================================================================
+# 
+# =============================================================================
+def AERONETcollocation(data1, data2, dates, timeWindow, Range):
+    """
+    Collocate AERONET with satellite / model data.
+    
+    @author: Sunji
+    Last updated date: 2019-11-13
+    """
+    try:
+        startdate, enddate = dates[0], dates[1]
+    except:
+        startdate = enddate = dates[0]
+
+    data1 = data1.rename(columns={"dateTime": "dateTime(INV)", "timeStamp": "timeStamp(INV)"})
+
+    COL = pd.DataFrame()
+    dates = pd.date_range(startdate, enddate)
+    for idate in dates:
+        mask = (data1['dateTime(INV)'].dt.date == idate.date())
+        data1_day = data1[mask].reset_index(drop = True)
+        mask = (data2['dateTime'].dt.date == idate.date())
+        data2_day = data2[mask].reset_index(drop = True)
+        
+        if len(data1_day) * len(data2_day) > 0:
+            for i in range(len(data1_day)):
+                lat1, lon1 = data1_day.iloc[i: i + 1]['Latitude(Degrees)'].values, data1_day.iloc[i: i + 1]['Longitude(Degrees)'].values
+                lat2, lon2 =  data2_day.lat.values, data2_day.lon.values
+                distance = geoDistance(lat1, lon1, lat2, lon2) # unit: km
+                dTime = abs(data1_day.iloc[i: i + 1]['timeStamp(INV)'].values - data2_day['timeStamp'].values) # unit: s
+                data2_day['dTime'] = dTime
+                mask1 = (distance <= Range) & (dTime <= timeWindow) # radius: 50 km, time window: +/-3 hr
+
+                if any(mask1):
+                    COL = COL.append(pd.concat([data2_day[mask1].mean().to_frame().T,\
+                                                data1_day.iloc[i: i + 1].reset_index(drop = True), \
+                                                ], axis = 1))
+    COL = COL.reset_index(drop = True)
+    return COL
 
 # =============================================================================
 # 
 # =============================================================================
-def AERONETcollocation(data1, data2, data3, dates, timeWindow, Range):
+def AERONETcollocationINVDS(data1, data2, data3, dates, timeWindow, Range):
     """
     Collocate AERONET with satellite / model data.
     
@@ -650,13 +690,13 @@ def AERONETcollocation(data1, data2, data3, dates, timeWindow, Range):
     
 
 
-##ROI = {'S':-90, 'N': 90, 'W': -180, 'E': 180}
-##
+#ROI = {'S':-90, 'N': 90, 'W': -180, 'E': 180}
+#
 #t1 = time.time()
 ##caseName = 'CA2019-01'
-#caseName = 'Global_2005-2018_v3'
+#caseName = 'Global_2014-2019'
 #
-#startdate = '%4i-%02i-%02i' % (2017, 1, 1)
+#startdate = '%4i-%02i-%02i' % (2014, 1, 1)
 #enddate   = '%4i-%02i-%02i' % (2019, 12, 31) 
 #
 #parameter = ['Single_Scattering_Albedo', 'Absorption_AOD', 'Asymmetry_Factor-Total', 'Angstrom_Exponent',
@@ -664,20 +704,23 @@ def AERONETcollocation(data1, data2, data3, dates, timeWindow, Range):
 #INV, support_info1 = AERONETinversion(caseName, [startdate, enddate], parameter = parameter)
 #INV_mean, INV_std = AERONETtimeProcess(INV, freq = 'day', window = False, span = ['12:00:00', '15:00:00'])
 ##para = AERONETwvlProcess(INV, support_info1, 'Single_Scattering_Albedo', [380, 550.], method = 'linear')
+#INV['Single_Scattering_Albedo[500nm]'] = AERONETwvlProcess(INV, support_info1, 'Single_Scattering_Albedo', [500.], method = 'linear')[float(500)]
 #INV['Single_Scattering_Albedo[550nm]'] = AERONETwvlProcess(INV, support_info1, 'Single_Scattering_Albedo', [550.], method = 'linear')[float(550)]
+#INV['Absorption_AOD[500nm]'] = AERONETwvlProcess(INV, support_info1, 'Absorption_AOD', [500.], method = 'AngstromExponent')[float(500)]
 #INV['Absorption_AOD[550nm]'] = AERONETwvlProcess(INV, support_info1, 'Absorption_AOD', [550.], method = 'AngstromExponent')[float(550)]
 #INV['Asymmetry_Factor-Total[550nm]'] = AERONETwvlProcess(INV, support_info1, 'Asymmetry_Factor-Total', [550.], method = 'linear')[float(550)]
 #INV['Refractive_Index-Real_Part[550nm]'] = AERONETwvlProcess(INV, support_info1, 'Refractive_Index-Real_Part', [550.], method = 'linear')[float(550)]
 #INV['Refractive_Index-Imaginary_Part[550nm]'] = AERONETwvlProcess(INV, support_info1, 'Refractive_Index-Imaginary_Part', [550.], method = 'linear')[float(550)]
-#INV.to_pickle(dataInputDir + 'AERONET/INV_2017-onwards.pickle')
+#INV.to_pickle(dataInputDir + 'AERONET/INV_2014-2019.pickle')
 #
 #
 #parameter = ['AOD', 'Angstrom_Exponent', 'Solar_Zenith_Angle(Degrees) ']
 #DS, support_info2 = AERONETdirectSun(caseName, [startdate, enddate], parameter = parameter)
 #DS_mean, DS_std = AERONETtimeProcess(DS, freq = 'day', window = True, span = ['12:00:00', '15:00:00'])
 ##para = AERONETwvlProcess(DS, support_info2, 'AOD', [340, 380, 500, 550], method = 'AngstromExponent')
+#DS['AOD_500nm'] = AERONETwvlProcess(DS, support_info2, 'AOD', [500.], method = 'AngstromExponent')[float(500)]
 #DS['AOD_550nm'] = AERONETwvlProcess(DS, support_info2, 'AOD', [550.], method = 'AngstromExponent')[float(550)]
-#DS.to_pickle(dataInputDir + 'AERONET/DS_2017-onwards.pickle')
+#DS.to_pickle(dataInputDir + 'AERONET/DS_2014-2019.pickle')
 #
 #
 #
